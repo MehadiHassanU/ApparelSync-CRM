@@ -9,7 +9,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "AIZCRM - Admin Dashboard",
+  title: "ApparelSync CRM - Admin Dashboard",
   description: "Next Generation Apparel CRM & Analytics Dashboard",
 };
 

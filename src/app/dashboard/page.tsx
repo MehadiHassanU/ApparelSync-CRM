@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { kpiMetrics, orderList as initialOrderList, Order, OrderStatus } from "../../lib/mockData";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { Order, OrderStatus } from "../../lib/mockData";
+import { supabase } from "../../lib/supabaseClient";
 import {
   Card,
   CardContent,
@@ -72,18 +73,9 @@ import {
   Sparkles,
   TrendingUp,
   LogOut,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
-
-// Mock revenue bar chart data
-const revenueChartData = [
-  { date: "14.12", revenue: 16000 },
-  { date: "21.12", revenue: 9000 },
-  { date: "28.12", revenue: 12500 },
-  { date: "4.01", revenue: 11000 },
-  { date: "11.01", revenue: 14000 },
-  { date: "18.01", revenue: 18500 },
-  { date: "25.01", revenue: 15000 },
-];
 
 // Category sales donut chart data
 const categorySalesData = [
@@ -119,8 +111,13 @@ const renderActiveShape = (props: any) => {
 };
 
 export default function Dashboard() {
-  // ─── Interactive States ──────────────────────────────────────────────────────
-  const [orders, setOrders] = useState<Order[]>(initialOrderList);
+  // ─── Live Supabase State ─────────────────────────────────────────────────────
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Filter & Search States
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activePayment, setActivePayment] = useState<string | null>(null);
@@ -136,6 +133,100 @@ export default function Dashboard() {
   const [newPrice, setNewPrice] = useState("");
   const [newPayment, setNewPayment] = useState("PayPal");
   const [newStatus, setNewStatus] = useState<OrderStatus>("on way");
+
+  // ─── Fetch Sales Data from Supabase ─────────────────────────────────────────
+  const fetchSalesFromSupabase = useCallback(async () => {
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const { data, error } = await supabase
+        .from("sales")
+        .select(`
+          id,
+          order_number,
+          total,
+          payment_method,
+          status,
+          sale_date,
+          customer_id,
+          customer:customers ( full_name )
+        `)
+        .order("sale_date", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        const mappedOrders: Order[] = data.map((item: any) => ({
+          id: item.id,
+          orderNumber: item.order_number || "N/A",
+          customerName: item.customer?.full_name || "Walk-in Customer",
+          customerId: item.customer_id,
+          category: "Apparel", // Default category representation
+          price: Number(item.total),
+          formattedPrice: `$${Number(item.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+          date: item.sale_date ? new Date(item.sale_date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+          paymentMethod: item.payment_method,
+          status: (item.status as OrderStatus) || "delivered",
+        }));
+        setOrders(mappedOrders);
+      }
+    } catch (err: any) {
+      console.error("Supabase Fetch Error:", err);
+      setErrorMsg(err.message || "Failed to load sales data from Supabase");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSalesFromSupabase();
+  }, [fetchSalesFromSupabase]);
+
+  // ─── Dynamic KPI Calculations ──────────────────────────────────────────────
+  const dynamicKPIs = useMemo(() => {
+    const totalRev = orders.reduce((sum, o) => sum + o.price, 0);
+    const totalOrd = orders.length;
+    const netProf = totalRev * 0.6; // Estimated net margin
+
+    return {
+      totalRevenue: {
+        formattedValue: `$${totalRev.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        value: totalRev,
+      },
+      totalOrders: {
+        formattedValue: totalOrd.toString(),
+        value: totalOrd,
+      },
+      netProfit: {
+        formattedValue: `$${netProf.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        value: netProf,
+      },
+    };
+  }, [orders]);
+
+  // Dynamic Revenue Chart Data derived from sales dates
+  const revenueChartData = useMemo(() => {
+    if (orders.length === 0) {
+      return [
+        { date: "Mon", revenue: 1200 },
+        { date: "Tue", revenue: 2100 },
+        { date: "Wed", revenue: 1800 },
+        { date: "Thu", revenue: 2400 },
+        { date: "Fri", revenue: 3100 },
+      ];
+    }
+    const map: Record<string, number> = {};
+    orders.forEach((o) => {
+      const d = o.date.slice(5); // MM-DD
+      map[d] = (map[d] || 0) + o.price;
+    });
+    return Object.entries(map)
+      .map(([date, revenue]) => ({ date, revenue }))
+      .slice(0, 7)
+      .reverse();
+  }, [orders]);
 
   // ─── Filtering & Sorting Logic ──────────────────────────────────────────────
   const filteredOrders = useMemo(() => {
@@ -164,37 +255,92 @@ export default function Dashboard() {
     setActivePayment(null);
   };
 
-  const handleAddOrder = (e: React.FormEvent) => {
+  // ─── Add Order to Supabase ──────────────────────────────────────────────────
+  const handleAddOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustomer || !newPrice) return;
 
-    const priceNum = parseFloat(newPrice);
-    const newOrderObj: Order = {
-      id: String(Date.now()),
-      orderNumber: `NA${Math.floor(100000 + Math.random() * 900000)}`,
-      customerName: newCustomer,
-      category: newCategory,
-      price: priceNum,
-      formattedPrice: `$${priceNum.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-      date: new Date().toISOString().split("T")[0],
-      paymentMethod: newPayment,
-      status: newStatus,
-    };
+    setIsSubmitting(true);
+    try {
+      // 1. Find or create Customer in Supabase
+      let customerId = null;
+      const { data: existingCust } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("full_name", newCustomer.trim())
+        .maybeSingle();
 
-    setOrders([newOrderObj, ...orders]);
-    setNewCustomer("");
-    setNewPrice("");
-    setIsAddDialogOpen(false);
+      if (existingCust) {
+        customerId = existingCust.id;
+      } else {
+        const { data: newCust, error: custErr } = await supabase
+          .from("customers")
+          .insert([{ full_name: newCustomer.trim() }])
+          .select("id")
+          .single();
+
+        if (custErr) throw custErr;
+        if (newCust) customerId = newCust.id;
+      }
+
+      // 2. Insert Sale into Supabase
+      const priceNum = parseFloat(newPrice);
+      const generatedOrderNum = `NA${Math.floor(100000 + Math.random() * 900000)}`;
+
+      const { error: saleErr } = await supabase.from("sales").insert([
+        {
+          order_number: generatedOrderNum,
+          customer_id: customerId,
+          subtotal: priceNum,
+          total: priceNum,
+          payment_method: newPayment,
+          status: newStatus,
+        },
+      ]);
+
+      if (saleErr) throw saleErr;
+
+      // Reset form & reload live data
+      setNewCustomer("");
+      setNewPrice("");
+      setIsAddDialogOpen(false);
+      await fetchSalesFromSupabase();
+    } catch (err: any) {
+      console.error("Add Order Error:", err);
+      alert(`Error creating order: ${err.message || "Unknown error"}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDeleteOrder = (id: string) => {
-    setOrders(orders.filter((o) => o.id !== id));
+  // ─── Delete Order from Supabase ─────────────────────────────────────────────
+  const handleDeleteOrder = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this order?")) return;
+    try {
+      const { error } = await supabase.from("sales").delete().eq("id", id);
+      if (error) throw error;
+      setOrders(orders.filter((o) => o.id !== id));
+    } catch (err: any) {
+      console.error("Delete Order Error:", err);
+      alert(`Could not delete order: ${err.message}`);
+    }
   };
 
-  const handleMarkDelivered = (id: string) => {
-    setOrders(
-      orders.map((o) => (o.id === id ? { ...o, status: "delivered" as OrderStatus } : o))
-    );
+  // ─── Mark Order Delivered in Supabase ───────────────────────────────────────
+  const handleMarkDelivered = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("sales")
+        .update({ status: "delivered" })
+        .eq("id", id);
+      if (error) throw error;
+      setOrders(
+        orders.map((o) => (o.id === id ? { ...o, status: "delivered" as OrderStatus } : o))
+      );
+    } catch (err: any) {
+      console.error("Update Status Error:", err);
+      alert(`Could not update order status: ${err.message}`);
+    }
   };
 
   const getStatusBadgeClass = (status: OrderStatus) => {
@@ -282,22 +428,34 @@ export default function Dashboard() {
           {/* Header Bar */}
           <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-[#1d2434] pb-6">
             <div>
-              <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">Hello, Labib</h1>
-              <p className="text-slate-400 text-sm mt-1.5 font-medium">This is what is happening in your store this month.</p>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">Hello, Store Manager</h1>
+                <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Store Active
+                </span>
+              </div>
+              <p className="text-slate-400 text-sm mt-1.5 font-medium">Real-time store operations, sales, and analytics.</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-4">
+              <button
+                onClick={() => fetchSalesFromSupabase()}
+                disabled={loading}
+                className="p-2.5 rounded-full bg-[#111520] border border-[#1d2434] text-slate-400 hover:text-white transition-all relative cursor-pointer"
+                title="Refresh Live Data"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-emerald-400" : ""}`} />
+              </button>
+
               <div className="relative flex-1 sm:flex-initial">
                 <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3" />
                 <Input
                   type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search store..."
                   className="bg-[#111520] border-[#1d2434] rounded-full py-2.5 pl-11 pr-5 text-xs text-slate-200 placeholder-slate-500 w-full sm:w-64 focus:border-emerald-500"
                 />
-              </div>
-
-              <div className="bg-[#111520] border border-[#1d2434] rounded-full px-4 py-2 text-xs text-emerald-400 font-bold shadow-sm">
-                Today, 22 Nov
               </div>
 
               <button className="p-2.5 rounded-full bg-[#111520] border border-[#1d2434] text-slate-400 hover:text-white transition-all relative">
@@ -307,15 +465,25 @@ export default function Dashboard() {
 
               <div className="flex items-center gap-3.5 pl-3 border-l border-[#1d2434]">
                 <div className="w-10 h-10 rounded-full bg-emerald-600/25 border border-emerald-500/40 flex items-center justify-center font-extrabold text-sm text-emerald-400 shadow-sm">
-                  LA
+                  CRM
                 </div>
                 <div className="hidden sm:block">
-                  <div className="text-sm font-bold text-white">Labib</div>
+                  <div className="text-sm font-bold text-white">Admin User</div>
                   <div className="text-xs text-slate-400 font-semibold">Store Manager</div>
                 </div>
               </div>
             </div>
           </header>
+
+          {/* Error Banner */}
+          {errorMsg && (
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold flex items-center justify-between">
+              <span>Error loading store data: {errorMsg}</span>
+              <Button onClick={() => fetchSalesFromSupabase()} size="sm" variant="outline" className="text-xs h-8 border-rose-500/40 text-rose-300">
+                Retry Connection
+              </Button>
+            </div>
+          )}
 
           {/* ─── Top KPI Cards Grid ────────────────────────────────────────────── */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -328,12 +496,14 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent className="p-0 pt-4">
-                <div className="text-4xl sm:text-5xl font-black tracking-tight">{kpiMetrics.totalRevenue.formattedValue}</div>
+                <div className="text-4xl sm:text-5xl font-black tracking-tight">
+                  {loading ? <Loader2 className="w-8 h-8 animate-spin" /> : dynamicKPIs.totalRevenue.formattedValue}
+                </div>
                 <div className="flex items-center gap-2.5 mt-5 text-xs font-bold">
                   <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-400/30 text-emerald-100 text-xs font-black">
-                    +12.5%
+                    Active Store
                   </span>
-                  <span className="text-indigo-100/90 font-semibold">vs last month</span>
+                  <span className="text-indigo-100/90 font-semibold">calculated dynamically</span>
                 </div>
               </CardContent>
             </Card>
@@ -347,12 +517,14 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent className="p-0 pt-4">
-                <div className="text-4xl sm:text-5xl font-black tracking-tight text-white">{kpiMetrics.totalOrders.formattedValue}</div>
+                <div className="text-4xl sm:text-5xl font-black tracking-tight text-white">
+                  {loading ? <Loader2 className="w-8 h-8 animate-spin" /> : dynamicKPIs.totalOrders.formattedValue}
+                </div>
                 <div className="flex items-center gap-2.5 mt-5 text-xs font-bold">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 text-xs font-black">
-                    -3.2%
+                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-black">
+                    Active
                   </span>
-                  <span className="text-slate-400 font-semibold">vs last month</span>
+                  <span className="text-slate-400 font-semibold">recorded in sales table</span>
                 </div>
               </CardContent>
             </Card>
@@ -360,18 +532,20 @@ export default function Dashboard() {
             {/* Card 3: Net Profit */}
             <Card className="bg-[#111520] border-[#1d2434] text-white shadow-xl hover:border-emerald-500/40 transition-all p-6 rounded-3xl">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-0">
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-400">Net Profit</CardTitle>
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-400">Net Profit (Est.)</CardTitle>
                 <div className="p-2 bg-[#171d2b] rounded-full border border-slate-700/50">
                   <TrendingUp className="w-5 h-5 text-teal-400" />
                 </div>
               </CardHeader>
               <CardContent className="p-0 pt-4">
-                <div className="text-4xl sm:text-5xl font-black tracking-tight text-white">{kpiMetrics.netProfit.formattedValue}</div>
+                <div className="text-4xl sm:text-5xl font-black tracking-tight text-white">
+                  {loading ? <Loader2 className="w-8 h-8 animate-spin" /> : dynamicKPIs.netProfit.formattedValue}
+                </div>
                 <div className="flex items-center gap-2.5 mt-5 text-xs font-bold">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-black">
-                    +8.4%
+                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-teal-500/20 text-teal-400 text-xs font-black">
+                    +60% Margin
                   </span>
-                  <span className="text-slate-400 font-semibold">vs last month</span>
+                  <span className="text-slate-400 font-semibold">estimated net profit</span>
                 </div>
               </CardContent>
             </Card>
@@ -406,7 +580,7 @@ export default function Dashboard() {
                       />
                       <Bar dataKey="revenue" fill="#6366f1" radius={[8, 8, 0, 0]}>
                         {revenueChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={index === 5 ? "#10b981" : "#6366f1"} />
+                          <Cell key={`cell-${index}`} fill={index === revenueChartData.length - 1 ? "#10b981" : "#6366f1"} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -415,7 +589,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Sales by Category Donut Chart (Fully Interactive Slices) */}
+            {/* Sales by Category Donut Chart */}
             <Card className="bg-[#111520] border-[#1d2434] text-white shadow-xl hover:border-emerald-500/40 transition-all rounded-3xl p-6 flex flex-col justify-between">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-0">
                 <div>
@@ -429,14 +603,16 @@ export default function Dashboard() {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        activeIndex={activePieIndex}
-                        activeShape={renderActiveShape}
-                        data={categorySalesData}
-                        innerRadius={44}
-                        outerRadius={66}
-                        paddingAngle={4}
-                        dataKey="value"
-                        onMouseEnter={(_, index) => setActivePieIndex(index)}
+                        {...({
+                          activeIndex: activePieIndex,
+                          activeShape: renderActiveShape,
+                          data: categorySalesData,
+                          innerRadius: 44,
+                          outerRadius: 66,
+                          paddingAngle: 4,
+                          dataKey: "value",
+                          onMouseEnter: (_: any, index: number) => setActivePieIndex(index),
+                        } as any)}
                       >
                         {categorySalesData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} className="cursor-pointer transition-all" />
@@ -530,8 +706,8 @@ export default function Dashboard() {
                       <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)} className="border-[#1d2434] text-slate-300 text-xs font-bold rounded-xl h-10">
                         Cancel
                       </Button>
-                      <Button type="submit" className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl h-10">
-                        Submit Order
+                      <Button type="submit" disabled={isSubmitting} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl h-10 flex items-center gap-2">
+                        {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />} Submit Order
                       </Button>
                     </DialogFooter>
                   </form>
@@ -543,26 +719,24 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               <div className="bg-gradient-to-br from-indigo-900/35 to-indigo-950/60 border border-indigo-500/30 rounded-3xl p-6 backdrop-blur-md shadow-lg hover:border-indigo-500/50 transition-all">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-300">New orders</span>
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-300">Total orders</span>
                   <PackageCheck className="w-5 h-5 text-indigo-400" />
                 </div>
                 <div className="flex items-baseline gap-3 mt-4">
-                  <span className="text-4xl font-black text-white">12</span>
-                  <span className="text-xs text-rose-400 font-black">-3.2%</span>
+                  <span className="text-4xl font-black text-white">{orders.length}</span>
                 </div>
-                <span className="text-xs text-slate-400 font-medium block mt-1.5">From last week</span>
+                <span className="text-xs text-slate-400 font-medium block mt-1.5">Live database count</span>
               </div>
 
               <div className="bg-gradient-to-br from-amber-900/30 to-amber-950/55 border border-amber-500/30 rounded-3xl p-6 backdrop-blur-md shadow-lg hover:border-amber-500/50 transition-all">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-amber-300">Await accepting</span>
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-amber-300">Awaiting</span>
                   <Clock className="w-5 h-5 text-amber-400" />
                 </div>
                 <div className="flex items-baseline gap-3 mt-4">
-                  <span className="text-4xl font-black text-white">20</span>
-                  <span className="text-xs text-emerald-400 font-black">+2.8%</span>
+                  <span className="text-4xl font-black text-white">{orders.filter(o => o.status === 'awaiting').length}</span>
                 </div>
-                <span className="text-xs text-slate-400 font-medium block mt-1.5">From last week</span>
+                <span className="text-xs text-slate-400 font-medium block mt-1.5">Awaiting processing</span>
               </div>
 
               <div className="bg-gradient-to-br from-yellow-900/30 to-yellow-950/55 border border-yellow-500/30 rounded-3xl p-6 backdrop-blur-md shadow-lg hover:border-yellow-500/50 transition-all">
@@ -571,10 +745,9 @@ export default function Dashboard() {
                   <Truck className="w-5 h-5 text-yellow-400" />
                 </div>
                 <div className="flex items-baseline gap-3 mt-4">
-                  <span className="text-4xl font-black text-white">57</span>
-                  <span className="text-xs text-rose-400 font-black">-3.2%</span>
+                  <span className="text-4xl font-black text-white">{orders.filter(o => o.status === 'on way').length}</span>
                 </div>
-                <span className="text-xs text-slate-400 font-medium block mt-1.5">From last week</span>
+                <span className="text-xs text-slate-400 font-medium block mt-1.5">In transit</span>
               </div>
 
               <div className="bg-gradient-to-br from-emerald-900/30 to-emerald-950/55 border border-emerald-500/30 rounded-3xl p-6 backdrop-blur-md shadow-lg hover:border-emerald-500/50 transition-all">
@@ -583,10 +756,9 @@ export default function Dashboard() {
                   <CheckCircle className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div className="flex items-baseline gap-3 mt-4">
-                  <span className="text-4xl font-black text-white">98</span>
-                  <span className="text-xs text-emerald-400 font-black">+2.8%</span>
+                  <span className="text-4xl font-black text-white">{orders.filter(o => o.status === 'delivered').length}</span>
                 </div>
-                <span className="text-xs text-slate-400 font-medium block mt-1.5">From last week</span>
+                <span className="text-xs text-slate-400 font-medium block mt-1.5">Completed orders</span>
               </div>
             </div>
 
@@ -673,7 +845,15 @@ export default function Dashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody data-testid="order-table-body" className="divide-y divide-[#171d2b]">
-                    {filteredOrders.length > 0 ? (
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-12 text-slate-400 text-xs font-bold">
+                          <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-5 h-5 animate-spin text-emerald-400" /> Loading sales records...
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredOrders.length > 0 ? (
                       filteredOrders.map((order) => (
                         <TableRow key={order.id} className="hover:bg-[#171d2b] border-[#171d2b] transition-colors">
                           <TableCell className="px-5 py-4">
@@ -682,7 +862,7 @@ export default function Dashboard() {
                           <TableCell className="px-5 py-4 font-mono text-xs font-extrabold text-emerald-400">{order.orderNumber}</TableCell>
                           <TableCell className="px-5 py-4">
                             <div className="font-bold text-white text-sm">{order.customerName}</div>
-                            <div className="text-xs text-slate-400 font-medium">Apparel ID #8920</div>
+                            <div className="text-[11px] text-slate-500 font-mono">ID: {order.customerId ? order.customerId.slice(0, 8) : "N/A"}</div>
                           </TableCell>
                           <TableCell className="px-5 py-4 text-slate-300 text-xs font-bold">{order.category}</TableCell>
                           <TableCell className="px-5 py-4 font-black text-white text-sm">{order.formattedPrice}</TableCell>
@@ -716,7 +896,7 @@ export default function Dashboard() {
                     ) : (
                       <TableRow>
                         <TableCell colSpan={9} className="text-center py-10 text-slate-400 text-xs font-bold">
-                          No matching orders found.
+                          No matching sales orders found.
                         </TableCell>
                       </TableRow>
                     )}
@@ -739,8 +919,12 @@ export default function Dashboard() {
             </DialogHeader>
             <div className="space-y-3.5 py-3 text-xs">
               <div className="flex justify-between py-1.5 border-b border-slate-800">
-                <span className="text-slate-400 font-medium">Customer:</span>
+                <span className="text-slate-400 font-medium">Customer Name:</span>
                 <span className="font-bold text-white text-sm">{selectedOrderDetails.customerName}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-slate-800">
+                <span className="text-slate-400 font-medium">Customer UUID:</span>
+                <span className="font-mono text-slate-400 text-xs">{selectedOrderDetails.customerId || "N/A"}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-slate-800">
                 <span className="text-slate-400 font-medium">Category:</span>

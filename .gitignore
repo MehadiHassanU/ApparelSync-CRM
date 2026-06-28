@@ -45,3 +45,11 @@ Thumbs.db
 
 # Vercel
 .vercel
+
+# SQL Database scripts
+*.sql
+
+# TypeScript build cache
+*.tsbuildinfo
+
+
