@@ -46,8 +46,8 @@ Thumbs.db
 # Vercel
 .vercel
 
-# SQL Database scripts
-*.sql
+# SQL Database scripts (keep migration.sql tracked)
+# *.sql
 
 # TypeScript build cache
 *.tsbuildinfo

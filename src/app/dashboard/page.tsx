@@ -56,14 +56,6 @@ import {
   Download,
   X,
   MoreHorizontal,
-  LayoutDashboard,
-  FileText,
-  Target,
-  Megaphone,
-  Briefcase,
-  CheckSquare,
-  Contact,
-  Shirt,
   Eye,
   Trash2,
   CheckCircle,
@@ -72,7 +64,6 @@ import {
   Truck,
   Sparkles,
   TrendingUp,
-  LogOut,
   Loader2,
   RefreshCw,
 } from "lucide-react";
@@ -357,74 +348,8 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0d14] text-slate-100 font-sans flex w-full overflow-x-hidden selection:bg-emerald-500 selection:text-white">
-      {/* ─── Expandable Sidebar ─────────────────────────────────────────────── */}
-      <aside className="fixed left-0 top-0 h-full z-50 bg-[#111520] border-r border-[#1d2434] shadow-2xl transition-all duration-300 ease-in-out w-20 hover:w-64 group/sidebar flex flex-col justify-between p-4 select-none">
-        <div className="flex flex-col gap-8 w-full">
-          {/* Brand Header */}
-          <div className="flex items-center gap-3.5 px-1 py-1 overflow-hidden">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/25">
-              <Shirt className="w-6 h-6 text-slate-950 stroke-[2.5]" />
-            </div>
-            <div className="flex flex-col whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-300 ease-in-out">
-              <span className="font-extrabold text-lg tracking-tight text-white">ApparelSync</span>
-              <span className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">CRM Suite</span>
-            </div>
-          </div>
+    <>
 
-          {/* Nav Items */}
-          <nav className="flex flex-col gap-2 w-full">
-            <div className="flex items-center gap-4 px-3.5 py-3 rounded-2xl bg-emerald-500 text-slate-950 font-bold text-base shadow-lg shadow-emerald-500/25 cursor-pointer overflow-hidden whitespace-nowrap">
-              <LayoutDashboard className="w-5 h-5 shrink-0" />
-              <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-300">Dashboard</span>
-            </div>
-            <div className="flex items-center gap-4 px-3.5 py-3 rounded-2xl text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 text-base font-semibold transition-all cursor-pointer overflow-hidden whitespace-nowrap">
-              <FileText className="w-5 h-5 shrink-0" />
-              <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-300">Reports</span>
-            </div>
-            <div className="flex items-center gap-4 px-3.5 py-3 rounded-2xl text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 text-base font-semibold transition-all cursor-pointer overflow-hidden whitespace-nowrap">
-              <Target className="w-5 h-5 shrink-0" />
-              <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-300">Leads</span>
-            </div>
-            <div className="flex items-center gap-4 px-3.5 py-3 rounded-2xl text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 text-base font-semibold transition-all cursor-pointer overflow-hidden whitespace-nowrap">
-              <TrendingUp className="w-5 h-5 shrink-0" />
-              <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-300">Revenue</span>
-            </div>
-            <div className="flex items-center gap-4 px-3.5 py-3 rounded-2xl text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 text-base font-semibold transition-all cursor-pointer overflow-hidden whitespace-nowrap">
-              <Megaphone className="w-5 h-5 shrink-0" />
-              <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-300">Marketing</span>
-            </div>
-            <div className="flex items-center gap-4 px-3.5 py-3 rounded-2xl text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 text-base font-semibold transition-all cursor-pointer overflow-hidden whitespace-nowrap">
-              <Briefcase className="w-5 h-5 shrink-0" />
-              <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-300">Inventory</span>
-            </div>
-            <div className="flex items-center gap-4 px-3.5 py-3 rounded-2xl text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 text-base font-semibold transition-all cursor-pointer overflow-hidden whitespace-nowrap">
-              <CheckSquare className="w-5 h-5 shrink-0" />
-              <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-300">Tasks</span>
-            </div>
-            <div className="flex items-center gap-4 px-3.5 py-3 rounded-2xl text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 text-base font-semibold transition-all cursor-pointer overflow-hidden whitespace-nowrap">
-              <Contact className="w-5 h-5 shrink-0" />
-              <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-300">Customers</span>
-            </div>
-            <div className="flex items-center gap-4 px-3.5 py-3 rounded-2xl text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 text-base font-semibold transition-all cursor-pointer overflow-hidden whitespace-nowrap">
-              <Settings className="w-5 h-5 shrink-0" />
-              <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-300">Settings</span>
-            </div>
-          </nav>
-        </div>
-
-        {/* Sidebar Footer Logout Button */}
-        <div className="w-full px-1">
-          <button className="flex items-center gap-4 px-3.5 py-3 rounded-2xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 text-base font-semibold transition-all w-full overflow-hidden whitespace-nowrap">
-            <LogOut className="w-5 h-5 shrink-0" />
-            <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-300">Logout</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* ─── Main Workspace ──────────────────────────────────────────────────────── */}
-      <main className="flex-1 pl-20 transition-all duration-300 w-full min-w-0">
-        <div className="w-full max-w-[1800px] mx-auto p-6 md:p-10 space-y-10">
           {/* Header Bar */}
           <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-[#1d2434] pb-6">
             <div>
@@ -905,8 +830,6 @@ export default function Dashboard() {
               </div>
             </Card>
           </div>
-        </div>
-      </main>
 
       {/* ─── Order Details Modal ─────────────────────────────────────────────── */}
       {selectedOrderDetails && (
@@ -980,6 +903,6 @@ export default function Dashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
