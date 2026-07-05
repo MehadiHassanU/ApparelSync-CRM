@@ -48,6 +48,7 @@ export default function ScannerCamera({
             // Omit qrbox to scan the entire frame, improving desktop webcam scan capability
           },
           (decodedText) => {
+            console.log("QR Decoded successfully:", decodedText);
             // Success callback
             onScanSuccess(decodedText);
           },
@@ -94,7 +95,7 @@ export default function ScannerCamera({
         {/* PURE EMPTY DIV for html5-qrcode. React never renders any children inside this to avoid DOM reconciliation conflicts. */}
         <div
           id={elementId}
-          className="w-full h-full [&_video]:object-cover [&_video]:w-full [&_video]:h-full"
+          className="w-full h-full [&_video]:object-contain [&_video]:w-full [&_video]:h-full"
         />
 
         {/* REACT OVERLAYS (Offline, Loading, Success, Laser line). Layered on top. */}
