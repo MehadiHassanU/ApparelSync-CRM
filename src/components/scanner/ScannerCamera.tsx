@@ -20,12 +20,61 @@ export default function ScannerCamera({
 }: ScannerCameraProps) {
   const [cameraState, setCameraState] = useState<"idle" | "starting" | "scanning" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Camera selection states
+  const [devices, setDevices] = useState<{ id: string; label: string }[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
+
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastScannedRef = useRef<{ text: string, time: number } | null>(null);
   const elementId = "pos-qr-reader";
 
+  // Effect to list and retrieve available cameras once active
   useEffect(() => {
     if (!isActive) {
+      setDevices([]);
+      setSelectedCameraId("");
+      return;
+    }
+
+    let isMounted = true;
+    setCameraState("starting");
+    setErrorMessage(null);
+
+    Html5Qrcode.getCameras()
+      .then((cameraDevices) => {
+        if (!isMounted) return;
+
+        if (cameraDevices && cameraDevices.length > 0) {
+          setDevices(cameraDevices);
+          
+          // Auto select back/rear camera if available (useful for mobile)
+          const backCam = cameraDevices.find((d) => {
+            const label = d.label.toLowerCase();
+            return label.includes("back") || label.includes("rear") || label.includes("environment");
+          });
+          
+          setSelectedCameraId(backCam ? backCam.id : cameraDevices[0].id);
+        } else {
+          setCameraState("error");
+          setErrorMessage("No camera devices found on this device.");
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error("Failed to list cameras:", err);
+        setCameraState("error");
+        setErrorMessage(err.message || "Failed to retrieve camera access permissions.");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isActive]);
+
+  // Effect to boot/teardown the scanner once selectedCameraId changes
+  useEffect(() => {
+    if (!isActive || !selectedCameraId) {
       setCameraState("idle");
       return;
     }
@@ -37,20 +86,9 @@ export default function ScannerCamera({
     let currentScanner: Html5Qrcode | null = null;
 
     const startScanner = async () => {
-      // First attempt: Request 640x480 resolution (highly responsive & low CPU lag)
-      const idealConstraints = {
-        facingMode: "environment",
-        width: { ideal: 640 },
-        height: { ideal: 480 }
-      };
-
       const scanConfig = {
         fps: 25, // 25 frames per second for ultra responsiveness
-        qrbox: (width: number, height: number) => {
-          const min = Math.min(width, height);
-          const size = min > 0 ? Math.floor(min * 0.75) : 250;
-          return { width: size, height: size };
-        },
+        qrbox: { width: 250, height: 250 }, // Use fixed qrbox to avoid dynamic canvas recalculation CPU lag
         experimentalFeatures: {
           useBarCodeDetectorIfSupported: true
         }
@@ -72,7 +110,7 @@ export default function ScannerCamera({
         }
 
         lastScannedRef.current = { text: decodedText, time: now };
-        console.log("QR Decoded successfully (throttled):", decodedText);
+        console.log("QR Decoded successfully (throttling check passed):", decodedText);
         onScanSuccess(decodedText);
       };
 
@@ -81,7 +119,7 @@ export default function ScannerCamera({
         scannerRef.current = currentScanner;
 
         await currentScanner.start(
-          idealConstraints,
+          selectedCameraId,
           scanConfig,
           handleDecodedText,
           (errorMessage) => {
@@ -90,86 +128,30 @@ export default function ScannerCamera({
         );
 
         if (!isMounted) {
-          console.log("Component unmounted while scanner was starting (attempt 1), shutting down stream...");
+          console.log("Component unmounted while scanner was starting, shutting down stream...");
           currentScanner.stop().catch(() => {});
           return;
         }
 
-        if (isMounted) {
-          setCameraState("scanning");
-        }
+        setCameraState("scanning");
       } catch (err: any) {
-        console.warn("Failed to start with ideal constraints, retrying with environment fallback...", err);
-
-        // Second attempt: Fallback to basic environment facingMode
-        try {
-          currentScanner = new Html5Qrcode(elementId);
-          scannerRef.current = currentScanner;
-
-          await currentScanner.start(
-            { facingMode: "environment" },
-            scanConfig,
-            handleDecodedText,
-            (errorMessage) => {
-              if (onScanError) onScanError(errorMessage);
-            }
-          );
-
-          if (!isMounted) {
-            console.log("Component unmounted while scanner was starting (attempt 2), shutting down stream...");
-            currentScanner.stop().catch(() => {});
-            return;
-          }
-
-          if (isMounted) {
-            setCameraState("scanning");
-          }
-        } catch (fallbackErr: any) {
-          console.warn("Failed to start with environment fallback, retrying with user (front) webcam...", fallbackErr);
-
-          // Third attempt: Fallback to user facingMode (front webcam for laptops)
-          try {
-            currentScanner = new Html5Qrcode(elementId);
-            scannerRef.current = currentScanner;
-
-            await currentScanner.start(
-              { facingMode: "user" },
-              scanConfig,
-              handleDecodedText,
-              (errorMessage) => {
-                if (onScanError) onScanError(errorMessage);
-              }
-            );
-
-            if (!isMounted) {
-              console.log("Component unmounted while scanner was starting (attempt 3), shutting down stream...");
-              currentScanner.stop().catch(() => {});
-              return;
-            }
-
-            if (isMounted) {
-              setCameraState("scanning");
-            }
-          } catch (userCamErr: any) {
-            console.error("Camera startup failed completely:", userCamErr);
-            if (isMounted) {
-              setCameraState("error");
-              const detailedError = userCamErr instanceof Error
-                ? `${userCamErr.name}: ${userCamErr.message}`
-                : typeof userCamErr === "string"
-                  ? userCamErr
-                  : String(userCamErr);
-              setErrorMessage(detailedError || "Failed to access camera.");
-            }
-          }
+        console.error("Camera startup failed for device ID:", selectedCameraId, err);
+        if (isMounted) {
+          setCameraState("error");
+          const detailedError = err instanceof Error
+            ? `${err.name}: ${err.message}`
+            : typeof err === "string"
+              ? err
+              : String(err);
+          setErrorMessage(detailedError || "Failed to start camera.");
         }
       }
     };
 
-    // Small delay to make sure DOM element is ready
+    // Small delay to make sure target container element is fully rendered in the DOM
     const timer = setTimeout(() => {
       startScanner();
-    }, 300);
+    }, 250);
 
     return () => {
       isMounted = false;
@@ -201,7 +183,7 @@ export default function ScannerCamera({
         console.warn("Failed to force stop camera tracks:", err);
       }
     };
-  }, [isActive, onScanSuccess, onScanError, onToggleActive]);
+  }, [isActive, selectedCameraId, onScanSuccess, onScanError]);
 
   return (
     <div className="flex flex-col items-center justify-center bg-[#111520] border border-[#1d2434] rounded-3xl p-6 relative min-h-[350px]">
@@ -229,14 +211,14 @@ export default function ScannerCamera({
           {cameraState === "starting" && (
             <div className="flex flex-col items-center text-emerald-400">
               <Loader2 className="w-12 h-12 animate-spin mb-3" />
-              <span className="text-xs font-bold uppercase tracking-wider">Initializing Camera...</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-center px-4">Initializing Camera...</span>
             </div>
           )}
 
           {cameraState === "error" && (
             <div className="flex flex-col items-center text-rose-400 p-4 text-center">
               <span className="text-xs font-bold uppercase tracking-wider text-rose-500 mb-2">Camera Error</span>
-              <span className="text-xs font-medium">{errorMessage}</span>
+              <span className="text-xs font-medium px-4">{errorMessage}</span>
             </div>
           )}
 
@@ -253,6 +235,26 @@ export default function ScannerCamera({
           )}
         </div>
       </div>
+
+      {/* Camera Selection Dropdown */}
+      {isActive && devices.length > 1 && (
+        <div className="mt-4 w-full max-w-xs mx-auto">
+          <label className="text-[10px] font-bold text-slate-400 block mb-1.5 uppercase tracking-wider text-center">
+            Active Camera Source
+          </label>
+          <select
+            value={selectedCameraId}
+            onChange={(e) => setSelectedCameraId(e.target.value)}
+            className="w-full bg-[#0a0d14] border border-[#1d2434] text-xs text-slate-300 h-10 rounded-xl px-3 outline-none focus:border-emerald-500 cursor-pointer"
+          >
+            {devices.map((device) => (
+              <option key={device.id} value={device.id}>
+                {device.label || `Camera ${device.id.slice(0, 5)}...`}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="mt-6 w-full flex justify-center">
         <Button
