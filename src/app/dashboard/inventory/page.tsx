@@ -185,12 +185,8 @@ export default function InventoryPage() {
       if (insertErr) throw insertErr;
 
       if (newProd) {
-        // Auto-generate QR data string containing type, id, sku
-        const qrPayload = JSON.stringify({
-          type: "product",
-          id: newProd.id,
-          sku: prodSku.trim(),
-        });
+        // Use plain SKU for low-density, easy-to-scan QR codes
+        const qrPayload = prodSku.trim();
 
         // Update product with QR data
         const { error: updateErr } = await supabase
@@ -239,11 +235,7 @@ export default function InventoryPage() {
     try {
       const priceNum = parseFloat(prodPrice);
       const stockNum = parseInt(prodStock, 10);
-      const qrPayload = JSON.stringify({
-        type: "product",
-        id: selectedProduct.id,
-        sku: prodSku.trim(),
-      });
+      const qrPayload = prodSku.trim();
 
       const { error: updateErr } = await supabase
         .from("products")
@@ -862,9 +854,9 @@ export default function InventoryPage() {
             <div className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl mt-4">
               <QRCodeSVG
                 id="qr-code-svg-element"
-                value={selectedProduct.qrData || JSON.stringify({ type: "product", id: selectedProduct.id, sku: selectedProduct.sku })}
+                value={selectedProduct.sku}
                 size={200}
-                level="H"
+                level="M"
               />
             </div>
             <div className="text-center mt-4">

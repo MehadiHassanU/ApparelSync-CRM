@@ -119,53 +119,33 @@ export default function ScannerPOSPage() {
     setScanQuantity(1);
 
     try {
-      let queryVal = value.trim();
-      let queryId: string | null = null;
-      let querySku: string | null = null;
+      const queryVal = value.trim();
+      if (!queryVal) return;
 
-      if (isFromQR) {
-        try {
-          // Parse QR JSON payload
-          const parsed = JSON.parse(value) as QRPayload;
-          if (parsed.type === "product" && parsed.id) {
-            queryId = parsed.id;
-          } else {
-            throw new Error("Invalid QR format");
-          }
-        } catch {
-          // If it fails to parse as JSON, fallback to treating the QR value as manual barcode/sku
-          querySku = queryVal;
-        }
-      } else {
-        querySku = queryVal;
-      }
-
-      let query = supabase.from("products").select(`
-        id,
-        name,
-        sku,
-        price,
-        stock_quantity,
-        category_id,
-        barcode,
-        qr_data,
-        created_at,
-        updated_at,
-        category:categories ( name )
-      `);
-
-      if (queryId) {
-        query = query.eq("id", queryId);
-      } else {
-        query = query.or(`sku.eq."${querySku}",barcode.eq."${querySku}"`);
-      }
-
-      const { data, error } = await query.maybeSingle();
+      // Match either the SKU directly or the manual Barcode (UPC/EAN)
+      // This is highly flexible, supporting low-density QR codes (which store the SKU string) and standard barcodes.
+      const { data, error } = await supabase
+        .from("products")
+        .select(`
+          id,
+          name,
+          sku,
+          price,
+          stock_quantity,
+          category_id,
+          barcode,
+          qr_data,
+          created_at,
+          updated_at,
+          category:categories ( name )
+        `)
+        .or(`sku.eq."${queryVal}",barcode.eq."${queryVal}"`)
+        .maybeSingle();
 
       if (error) throw error;
 
       if (!data) {
-        throw new Error("No product found matching this code.");
+        throw new Error(`No product found matching code: "${queryVal}"`);
       }
 
       const foundProduct: Product = {
