@@ -39,18 +39,18 @@ export default function ScannerCamera({
     let isMounted = true;
 
     const startScanner = async () => {
-      try {
-        // Request back camera as preference, with HD resolution targets to maximize QR decoding accuracy
-        const cameraConstraints = {
-          facingMode: "environment",
-          width: { min: 640, ideal: 1280, max: 1920 },
-          height: { min: 480, ideal: 720, max: 1080 }
-        };
+      // First attempt: Request HD resolution using 'ideal' values
+      const hdConstraints = {
+        facingMode: "environment",
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      };
 
+      try {
         await html5Qrcode.start(
-          cameraConstraints,
+          hdConstraints,
           {
-            fps: 25, // scan at 25 frames per second for ultra responsiveness
+            fps: 25, // scan at 25 frames per second for responsiveness
             qrbox: (width, height) => {
               const min = Math.min(width, height);
               // Use 75% of the viewport or default to 250px if dimensions aren't resolved yet
@@ -72,11 +72,39 @@ export default function ScannerCamera({
           setCameraState("scanning");
         }
       } catch (err: any) {
-        console.error("Failed to start camera scanner:", err);
-        if (isMounted) {
-          setCameraState("error");
-          setErrorMessage(err.message || "Failed to access camera. Check permissions.");
-          onToggleActive(); // Stop request
+        console.warn("Failed to start with HD constraints, retrying with safe fallback...", err);
+
+        // Second attempt: Fallback to basic environment facingMode
+        try {
+          await html5Qrcode.start(
+            { facingMode: "environment" },
+            {
+              fps: 25,
+              qrbox: (width, height) => {
+                const min = Math.min(width, height);
+                const size = min > 0 ? Math.floor(min * 0.75) : 250;
+                return { width: size, height: size };
+              },
+            },
+            (decodedText) => {
+              console.log("QR Decoded successfully:", decodedText);
+              // Success callback
+              onScanSuccess(decodedText);
+            },
+            (errorMessage) => {
+              if (onScanError) onScanError(errorMessage);
+            }
+          );
+          if (isMounted) {
+            setCameraState("scanning");
+          }
+        } catch (fallbackErr: any) {
+          console.error("Camera startup failed completely:", fallbackErr);
+          if (isMounted) {
+            setCameraState("error");
+            setErrorMessage(fallbackErr.message || "Failed to access camera. Check permissions.");
+            onToggleActive(); // Stop request
+          }
         }
       }
     };
