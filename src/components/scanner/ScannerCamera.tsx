@@ -88,38 +88,43 @@ export default function ScannerCamera({
 
   return (
     <div className="flex flex-col items-center justify-center bg-[#111520] border border-[#1d2434] rounded-3xl p-6 relative min-h-[350px]">
-      {/* Scanner Element Target */}
+      {/* Scanner Wrapper Container */}
       <div
-        id={elementId}
         className={`w-full max-w-sm aspect-square overflow-hidden rounded-2xl border-2 border-dashed ${
           cameraState === "scanning" ? "border-emerald-500" : "border-slate-700/60"
-        } bg-[#0a0d14] flex items-center justify-center relative`}
+        } bg-[#0a0d14] relative flex items-center justify-center`}
       >
-        {cameraState === "idle" && (
-          <div className="flex flex-col items-center text-slate-500">
-            <Camera className="w-16 h-16 mb-3 stroke-[1.5]" />
-            <span className="text-xs font-bold uppercase tracking-wider">Camera Offline</span>
-          </div>
-        )}
+        {/* PURE EMPTY DIV for html5-qrcode. React never renders any children inside this to avoid DOM reconciliation conflicts. */}
+        <div
+          id={elementId}
+          className="absolute inset-0 w-full h-full [&_video]:object-cover [&_video]:w-full [&_video]:h-full"
+        />
 
-        {cameraState === "starting" && (
-          <div className="flex flex-col items-center text-emerald-400">
-            <Loader2 className="w-12 h-12 animate-spin mb-3" />
-            <span className="text-xs font-bold uppercase tracking-wider">Initializing Camera...</span>
-          </div>
-        )}
+        {/* REACT OVERLAYS (Offline, Loading, Success, Laser line). Layered on top. */}
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+          {cameraState === "idle" && (
+            <div className="flex flex-col items-center text-slate-500">
+              <Camera className="w-16 h-16 mb-3 stroke-[1.5]" />
+              <span className="text-xs font-bold uppercase tracking-wider">Camera Offline</span>
+            </div>
+          )}
 
-        {cameraState === "error" && (
-          <div className="flex flex-col items-center text-rose-400 p-4 text-center">
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-500 mb-2">Camera Error</span>
-            <span className="text-xs font-medium">{errorMessage}</span>
-          </div>
-        )}
+          {cameraState === "starting" && (
+            <div className="flex flex-col items-center text-emerald-400">
+              <Loader2 className="w-12 h-12 animate-spin mb-3" />
+              <span className="text-xs font-bold uppercase tracking-wider">Initializing Camera...</span>
+            </div>
+          )}
 
-        {/* Success Scan Overlay Flasher */}
-        {cameraState === "scanning" && (
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            <div className="w-[70%] h-[70%] border-2 border-emerald-400/40 rounded-xl relative">
+          {cameraState === "error" && (
+            <div className="flex flex-col items-center text-rose-400 p-4 text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-rose-500 mb-2">Camera Error</span>
+              <span className="text-xs font-medium">{errorMessage}</span>
+            </div>
+          )}
+
+          {cameraState === "scanning" && (
+            <div className="w-[70%] h-[70%] border-2 border-emerald-400/40 rounded-xl relative flex items-center justify-center">
               {/* Corner Indicators */}
               <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-emerald-400 -mt-1 -ml-1 rounded-tl-sm" />
               <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-emerald-400 -mt-1 -mr-1 rounded-tr-sm" />
@@ -128,8 +133,8 @@ export default function ScannerCamera({
               {/* Laser line animation */}
               <div className="w-full h-0.5 bg-emerald-400/80 absolute top-0 left-0 animate-bounce shadow-md shadow-emerald-400/50" style={{ animationDuration: "2.5s" }} />
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="mt-6 w-full flex justify-center">
