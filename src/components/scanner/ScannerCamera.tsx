@@ -138,10 +138,16 @@ export default function ScannerCamera({
         await scanner.start(
           selectedCameraId,
           {
-            fps: 10,                 // 10fps is optimal: fast enough for instant feel, low enough to avoid CPU burn
-            qrbox: { width: 280, height: 280 },
-            aspectRatio: 1.0,        // Square viewport for consistent QR framing
+            fps: 10,
+            qrbox: (vw: number, vh: number) => {
+              // Use 70% of the smaller video dimension, capped at 300px
+              const side = Math.min(Math.floor(Math.min(vw, vh) * 0.7), 300);
+              return { width: side, height: side };
+            },
             disableFlip: false,
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true,
+            },
           },
           handleDecode,
           () => {}  // Silence per-frame "no QR found" noise
