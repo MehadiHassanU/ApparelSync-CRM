@@ -44,11 +44,8 @@ export default function ScannerCamera({
         await html5Qrcode.start(
           { facingMode: "environment" },
           {
-            fps: 10,
-            qrbox: (width, height) => {
-              const size = Math.min(width, height) * 0.7;
-              return { width: size, height: size };
-            },
+            fps: 20,
+            // Omit qrbox to scan the entire frame, improving desktop webcam scan capability
           },
           (decodedText) => {
             // Success callback
@@ -97,7 +94,7 @@ export default function ScannerCamera({
         {/* PURE EMPTY DIV for html5-qrcode. React never renders any children inside this to avoid DOM reconciliation conflicts. */}
         <div
           id={elementId}
-          className="absolute inset-0 w-full h-full [&_video]:object-cover [&_video]:w-full [&_video]:h-full"
+          className="w-full h-full [&_video]:object-cover [&_video]:w-full [&_video]:h-full"
         />
 
         {/* REACT OVERLAYS (Offline, Loading, Success, Laser line). Layered on top. */}
