@@ -18,6 +18,8 @@ import {
   User,
   CreditCard,
   CheckCircle,
+  Trash,
+  Printer,
 } from "lucide-react";
 import ScannerCamera from "@/components/scanner/ScannerCamera";
 import Cart from "@/components/scanner/Cart";
@@ -38,6 +40,7 @@ export default function ScannerPOSPage() {
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [successOrderNum, setSuccessOrderNum] = useState<string | null>(null);
+  const [lastOrderTotal, setLastOrderTotal] = useState(0);
 
   // Autocomplete fetcher inside useEffect to decouple state updates
   React.useEffect(() => {
@@ -208,11 +211,45 @@ export default function ScannerPOSPage() {
     }
   }, []);
 
+  // Synthesize a scan beep sound using Web Audio API (cross-browser, no asset files required)
+  const playBeep = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.type = "sine";
+      osc.frequency.value = 880; // High register A5 pitch
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
+    } catch (e) {
+      console.warn("Audio feedback beep failed:", e);
+    }
+  }, []);
+
   // ─── Scan success handler ──────────────────────────────────────────────────
-  const handleScanSuccess = (decodedText: string) => {
-    // Briefly stop scanner or keep running, play sound/feedback if desired
+  const handleScanSuccess = useCallback((decodedText: string) => {
+    playBeep();
     lookupProduct(decodedText, true);
-  };
+  }, [lookupProduct, playBeep]);
+
+  const handleToggleScanner = useCallback(() => {
+    setIsScannerActive((prev) => !prev);
+  }, []);
+
+  const handleClearCart = useCallback(() => {
+    if (confirm("Are you sure you want to empty the shopping cart?")) {
+      setCart([]);
+    }
+  }, []);
 
   // ─── Cart Manipulations ─────────────────────────────────────────────────────
   const handleManualLookup = (e: React.FormEvent) => {
@@ -339,6 +376,7 @@ export default function ScannerPOSPage() {
       }
 
       // Complete checkout state
+      setLastOrderTotal(cartTotal);
       setSuccessOrderNum(orderNumber);
       setCart([]);
       setCustomerName("");
@@ -375,7 +413,7 @@ export default function ScannerPOSPage() {
             <CardContent className="p-0">
               <ScannerCamera
                 isActive={isScannerActive}
-                onToggleActive={() => setIsScannerActive(!isScannerActive)}
+                onToggleActive={handleToggleScanner}
                 onScanSuccess={handleScanSuccess}
               />
             </CardContent>
@@ -504,16 +542,60 @@ export default function ScannerPOSPage() {
           )}
 
           {/* Success Dialog */}
+          {/* Success Dialog / Receipt */}
           {successOrderNum && (
-            <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
-                <span className="text-sm font-black">Transaction Completed Successfully!</span>
+            <Card className="bg-[#111520] border-emerald-500/30 border shadow-2xl rounded-3xl p-6 relative overflow-hidden">
+              <div className="flex items-center gap-2 text-emerald-400 mb-4">
+                <CheckCircle className="w-6 h-6 stroke-[2.5]" />
+                <span className="text-base font-black">Sale Completed!</span>
               </div>
-              <p className="font-semibold text-slate-400 mt-1">
-                Order <span className="font-mono text-emerald-400">#{successOrderNum}</span> has been processed. Product quantities are automatically deducted from the database.
-              </p>
-            </div>
+              
+              {/* Receipt Ticket Shape */}
+              <div className="bg-[#0a0d14] border border-[#1d2434] rounded-2xl p-5 font-mono text-xs text-slate-300 space-y-3 relative">
+                {/* Decorative cutouts at top/bottom */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 w-[90%] border-t-2 border-dashed border-[#1d2434]" />
+                
+                <div className="text-center pb-2 border-b border-dashed border-[#1d2434]">
+                  <h4 className="font-black text-white uppercase text-sm tracking-widest">ApparelSync POS</h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Official Transaction Receipt</p>
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Order ID:</span>
+                    <span className="text-white font-bold">#{successOrderNum}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Date:</span>
+                    <span className="text-white">
+                      {new Date().toLocaleDateString()} {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Payment:</span>
+                    <span className="text-emerald-400 font-bold">{paymentMethod}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Status:</span>
+                    <span className="text-indigo-400 font-extrabold uppercase text-[10px] tracking-wider">Paid / Delivered</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-dashed border-[#1d2434] flex justify-between items-center text-sm font-black text-white">
+                  <span>TOTAL PAID</span>
+                  <span className="text-emerald-400">${lastOrderTotal.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="mt-5 flex gap-3">
+                <Button
+                  onClick={() => setSuccessOrderNum(null)}
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl h-11 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/25 transition-all"
+                >
+                  Start New Sale
+                </Button>
+              </div>
+            </Card>
           )}
         </div>
 
@@ -524,9 +606,21 @@ export default function ScannerPOSPage() {
               <CardTitle className="text-base font-extrabold text-white flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5 text-indigo-400" /> Shopping Cart
               </CardTitle>
-              <Badge className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 text-[10px] font-black px-2 py-0.5 rounded-full">
-                {cart.reduce((sum, item) => sum + item.quantity, 0)} items
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 text-[10px] font-black px-2 py-0.5 rounded-full">
+                  {cart.reduce((sum, item) => sum + item.quantity, 0)} items
+                </Badge>
+                {cart.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleClearCart}
+                    className="h-7 px-2.5 text-[10px] font-black text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Trash className="w-3.5 h-3.5" /> Clear
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="p-0 pt-6">
               <Cart

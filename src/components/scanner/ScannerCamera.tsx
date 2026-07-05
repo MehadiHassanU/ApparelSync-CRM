@@ -36,11 +36,23 @@ export default function ScannerCamera({
     let currentScanner: Html5Qrcode | null = null;
 
     const startScanner = async () => {
-      // First attempt: Request HD resolution using 'ideal' values
-      const hdConstraints = {
+      // First attempt: Request 640x480 resolution (highly responsive & low CPU lag)
+      const idealConstraints = {
         facingMode: "environment",
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      };
+
+      const scanConfig = {
+        fps: 25, // 25 frames per second for ultra responsiveness
+        qrbox: (width: number, height: number) => {
+          const min = Math.min(width, height);
+          const size = min > 0 ? Math.floor(min * 0.75) : 250;
+          return { width: size, height: size };
+        },
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        }
       };
 
       try {
@@ -48,23 +60,14 @@ export default function ScannerCamera({
         scannerRef.current = currentScanner;
 
         await currentScanner.start(
-          hdConstraints,
-          {
-            fps: 25, // scan at 25 frames per second for responsiveness
-            qrbox: (width, height) => {
-              const min = Math.min(width, height);
-              // Use 75% of the viewport or default to 250px if dimensions aren't resolved yet
-              const size = min > 0 ? Math.floor(min * 0.75) : 250;
-              return { width: size, height: size };
-            },
-          },
+          idealConstraints,
+          scanConfig,
           (decodedText) => {
             console.log("QR Decoded successfully:", decodedText);
             // Success callback
             onScanSuccess(decodedText);
           },
           (errorMessage) => {
-            // verbose scan error, don't alerts user to avoid noise
             if (onScanError) onScanError(errorMessage);
           }
         );
@@ -72,7 +75,7 @@ export default function ScannerCamera({
           setCameraState("scanning");
         }
       } catch (err: any) {
-        console.warn("Failed to start with HD constraints, retrying with environment fallback...", err);
+        console.warn("Failed to start with ideal constraints, retrying with environment fallback...", err);
 
         // Second attempt: Fallback to basic environment facingMode
         try {
@@ -81,17 +84,9 @@ export default function ScannerCamera({
 
           await currentScanner.start(
             { facingMode: "environment" },
-            {
-              fps: 25,
-              qrbox: (width, height) => {
-                const min = Math.min(width, height);
-                const size = min > 0 ? Math.floor(min * 0.75) : 250;
-                return { width: size, height: size };
-              },
-            },
+            scanConfig,
             (decodedText) => {
               console.log("QR Decoded successfully:", decodedText);
-              // Success callback
               onScanSuccess(decodedText);
             },
             (errorMessage) => {
@@ -111,17 +106,9 @@ export default function ScannerCamera({
 
             await currentScanner.start(
               { facingMode: "user" },
-              {
-                fps: 25,
-                qrbox: (width, height) => {
-                  const min = Math.min(width, height);
-                  const size = min > 0 ? Math.floor(min * 0.75) : 250;
-                  return { width: size, height: size };
-                },
-              },
+              scanConfig,
               (decodedText) => {
                 console.log("QR Decoded successfully:", decodedText);
-                // Success callback
                 onScanSuccess(decodedText);
               },
               (errorMessage) => {
@@ -155,11 +142,31 @@ export default function ScannerCamera({
     return () => {
       isMounted = false;
       clearTimeout(timer);
+
+      // 1. Standard instance stop
       if (scannerRef.current) {
         const scannerInstance = scannerRef.current;
         if (scannerInstance.isScanning) {
           scannerInstance.stop().catch((e) => console.error("Cleanup stop error:", e));
+        } else {
+          try {
+            scannerInstance.clear();
+          } catch (e) {}
         }
+      }
+
+      // 2. Forced Hardware Release: Stop camera stream tracks directly from the video element
+      try {
+        const videoEl = document.querySelector(`#${elementId} video`) as HTMLVideoElement | null;
+        if (videoEl && videoEl.srcObject) {
+          const stream = videoEl.srcObject as MediaStream;
+          stream.getTracks().forEach((track) => {
+            track.stop();
+            console.log("Forced stopped webcam track:", track.label);
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to force stop camera tracks:", err);
       }
     };
   }, [isActive, onScanSuccess, onScanError, onToggleActive]);
