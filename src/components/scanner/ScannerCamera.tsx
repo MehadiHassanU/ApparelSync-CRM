@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { Camera, Loader2, StopCircle, Zap, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -20,216 +20,127 @@ export default function ScannerCamera({
 }: ScannerCameraProps) {
   const [cameraState, setCameraState] = useState<"idle" | "starting" | "scanning" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [devices, setDevices] = useState<{ id: string; label: string }[]>([]);
-  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
   const [scanFlash, setScanFlash] = useState(false);
   const [lastScannedLabel, setLastScannedLabel] = useState<string | null>(null);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const readerReady = useRef(false);
+  const lockRef = useRef(false);
   const lastScannedRef = useRef<{ text: string; time: number } | null>(null);
+
+  // Keep callback refs fresh without triggering effect re-runs
   const onScanSuccessRef = useRef(onScanSuccess);
   const onScanErrorRef = useRef(onScanError);
+  useEffect(() => { onScanSuccessRef.current = onScanSuccess; }, [onScanSuccess]);
+  useEffect(() => { onScanErrorRef.current = onScanError; }, [onScanError]);
+
   const elementId = "pos-qr-reader";
 
-  // Keep callback refs fresh without triggering effect re-runs.
-  // This is THE critical fix — the previous code had onScanSuccess in the
-  // dependency array, which caused the entire camera to restart every time
-  // the parent re-rendered (e.g. when cart state changed).
-  useEffect(() => {
-    onScanSuccessRef.current = onScanSuccess;
-  }, [onScanSuccess]);
+  // ── Stop camera (reusable) ──────────────────────────────────────────────────
+  const stopCamera = useCallback(async () => {
+    if (scannerRef.current && readerReady.current) {
+      try { await scannerRef.current.stop(); } catch {}
+      try { scannerRef.current.clear(); } catch {}
+      readerReady.current = false;
+    }
+    scannerRef.current = null;
+    lockRef.current = false;
+  }, []);
 
-  useEffect(() => {
-    onScanErrorRef.current = onScanError;
-  }, [onScanError]);
+  // ── Start camera ───────────────────────────────────────────────────────────
+  const startCamera = useCallback(async () => {
+    lockRef.current = false;
+    setCameraState("starting");
+    setErrorMessage(null);
 
-  // Step 1: List cameras when scanner is activated
-  useEffect(() => {
-    if (!isActive) {
-      setDevices([]);
-      setSelectedCameraId("");
-      setCameraState("idle");
-      setErrorMessage(null);
-      setLastScannedLabel(null);
-      return;
+    // Create a fresh instance if needed
+    if (!scannerRef.current) {
+      scannerRef.current = new Html5Qrcode(elementId, {
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        verbose: false,
+      });
+      readerReady.current = false;
     }
 
-    let cancelled = false;
-    setCameraState("starting");
-    setErrorMessage(null);
-
-    Html5Qrcode.getCameras()
-      .then((cams) => {
-        if (cancelled) return;
-        if (!cams || cams.length === 0) {
-          setCameraState("error");
-          setErrorMessage("No camera found. Please connect a camera and try again.");
-          return;
-        }
-        setDevices(cams);
-        // Prefer back/rear camera on mobile, otherwise first camera
-        const back = cams.find((c) => /back|rear|environment/i.test(c.label));
-        setSelectedCameraId(back ? back.id : cams[0].id);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        console.error("getCameras failed:", err);
-        setCameraState("error");
-        setErrorMessage(
-          "Camera permission denied. Please allow camera access in your browser settings and reload."
-        );
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isActive]);
-
-  // Step 2: Start/stop scanner when selectedCameraId changes
-  useEffect(() => {
-    if (!isActive || !selectedCameraId) return;
-
-    let cancelled = false;
-    let scanner: Html5Qrcode | null = null;
-
-    setCameraState("starting");
-    setErrorMessage(null);
-
-    const boot = async () => {
-      // Ensure the DOM container exists and is empty
-      const container = document.getElementById(elementId);
-      if (!container) {
-        console.error("Scanner container element not found");
-        if (!cancelled) {
-          setCameraState("error");
-          setErrorMessage("Scanner container not found in page.");
-        }
-        return;
-      }
-
-      // Clean any leftover DOM from previous scanner instances
-      container.innerHTML = "";
-
+    if (!readerReady.current) {
       try {
-        scanner = new Html5Qrcode(elementId, /* verbose= */ false);
-        scannerRef.current = scanner;
+        await scannerRef.current.start(
+          { facingMode: "environment" },
+          { fps: 12, qrbox: { width: 240, height: 240 }, disableFlip: true },
+          (decoded) => {
+            if (lockRef.current) return;
 
-        const handleDecode = (decodedText: string) => {
-          const now = Date.now();
-          const last = lastScannedRef.current;
+            // Throttle: same code 3s, any code 1s
+            const now = Date.now();
+            const last = lastScannedRef.current;
+            if (last) {
+              if (last.text === decoded && now - last.time < 3000) return;
+              if (now - last.time < 1000) return;
+            }
 
-          // Throttle: same code within 3s, or any code within 1s
-          if (last) {
-            if (last.text === decodedText && now - last.time < 3000) return;
-            if (now - last.time < 1000) return;
-          }
+            lockRef.current = true;
+            lastScannedRef.current = { text: decoded, time: now };
 
-          lastScannedRef.current = { text: decodedText, time: now };
+            // Visual flash
+            setScanFlash(true);
+            setLastScannedLabel(decoded);
+            setTimeout(() => setScanFlash(false), 400);
 
-          // Visual flash feedback
-          setScanFlash(true);
-          setLastScannedLabel(decodedText);
-          setTimeout(() => setScanFlash(false), 400);
+            // Pause scanning while we process, then unlock after a beat
+            try { scannerRef.current?.pause(true); } catch {}
 
-          // Fire callback via ref (won't cause re-mount)
-          onScanSuccessRef.current(decodedText);
-        };
+            onScanSuccessRef.current(decoded);
 
-        await scanner.start(
-          selectedCameraId,
-          {
-            fps: 10,
-            qrbox: (vw: number, vh: number) => {
-              // Use 70% of the smaller video dimension, capped at 300px
-              const side = Math.min(Math.floor(Math.min(vw, vh) * 0.7), 300);
-              return { width: side, height: side };
-            },
-            disableFlip: false,
-            experimentalFeatures: {
-              useBarCodeDetectorIfSupported: true,
-            },
+            // Resume after 1.5s to allow next scan
+            setTimeout(() => {
+              try { scannerRef.current?.resume(); } catch {}
+              lockRef.current = false;
+            }, 1500);
           },
-          handleDecode,
-          () => {}  // Silence per-frame "no QR found" noise
+          () => {} // silence per-frame "no QR found"
         );
-
-        if (cancelled) {
-          // Component unmounted during async start — tear down immediately
-          await scanner.stop().catch(() => {});
-          return;
-        }
-
+        readerReady.current = true;
         setCameraState("scanning");
       } catch (err: any) {
-        console.error("Scanner start failed:", err);
-        if (!cancelled) {
-          setCameraState("error");
-          setErrorMessage(
-            err?.message?.includes("Permission")
-              ? "Camera permission was denied. Please allow access and try again."
-              : `Camera failed to start: ${err?.message || String(err)}`
-          );
-        }
+        console.error("Camera start failed:", err);
+        setCameraState("error");
+        setErrorMessage(
+          err?.message?.includes("Permission")
+            ? "Camera permission denied. Please allow access and try again."
+            : `Camera failed: ${err?.message || String(err)}`
+        );
       }
-    };
+    } else {
+      // Already started before — just resume
+      try { scannerRef.current?.resume(); } catch {}
+      lockRef.current = false;
+      setCameraState("scanning");
+    }
+  }, []);
 
-    // Brief delay for React to flush the empty container div to the DOM
-    const timer = setTimeout(boot, 150);
+  // ── Lifecycle: start/stop based on isActive ─────────────────────────────────
+  useEffect(() => {
+    if (isActive) {
+      // Small delay to ensure the DOM container is rendered
+      const timer = setTimeout(() => startCamera(), 150);
+      return () => clearTimeout(timer);
+    } else {
+      stopCamera();
+      setCameraState("idle");
+      setLastScannedLabel(null);
+    }
+  }, [isActive, startCamera, stopCamera]);
 
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-
-      const inst = scannerRef.current;
-      scannerRef.current = null;
-
-      if (inst) {
-        // Graceful stop
-        const safeStop = async () => {
-          try {
-            const state = inst.getState();
-            if (
-              state === Html5QrcodeScannerState.SCANNING ||
-              state === Html5QrcodeScannerState.PAUSED
-            ) {
-              await inst.stop();
-            }
-          } catch (e) {
-            // Swallow — might already be stopped
-          }
-          try {
-            inst.clear();
-          } catch (e) {}
-        };
-        safeStop();
-      }
-
-      // Belt-and-suspenders: force-kill any lingering MediaStream tracks
-      // so the camera LED actually turns off
-      try {
-        const video = document.querySelector(`#${elementId} video`) as HTMLVideoElement | null;
-        if (video?.srcObject) {
-          (video.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
-          video.srcObject = null;
-        }
-      } catch {}
-
-      // Clear the container to prevent stale DOM from confusing the next instance
-      const container = document.getElementById(elementId);
-      if (container) container.innerHTML = "";
-    };
-  }, [isActive, selectedCameraId]); // Intentionally excludes callback props — we use refs
+  // ── Cleanup on unmount ──────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => { stopCamera(); };
+  }, [stopCamera]);
 
   const handleRetry = useCallback(() => {
-    // Force a fresh camera cycle by toggling off then on
-    setSelectedCameraId("");
-    setCameraState("starting");
-    setTimeout(() => {
-      if (devices.length > 0) {
-        setSelectedCameraId(devices[0].id);
-      }
-    }, 300);
-  }, [devices]);
+    stopCamera().then(() => {
+      setTimeout(() => startCamera(), 200);
+    });
+  }, [stopCamera, startCamera]);
 
   return (
     <div className="flex flex-col items-center justify-center bg-[#111520] border border-[#1d2434] rounded-3xl p-6 relative min-h-[350px]">
@@ -241,15 +152,12 @@ export default function ScannerCamera({
             : cameraState === "scanning"
               ? "border-emerald-500/50 border-dashed"
               : "border-slate-700/60 border-dashed"
-        } bg-[#0a0d14] relative flex items-center justify-center transition-all duration-200`}
+        } bg-black relative flex items-center justify-center transition-all duration-200`}
       >
-        {/* html5-qrcode target — must stay empty, no React children */}
-        <div
-          id={elementId}
-          className="w-full h-full [&_video]:object-cover [&_video]:w-full [&_video]:h-full"
-        />
+        {/* html5-qrcode mounts its own video/canvas here — never put React children inside */}
+        <div id={elementId} />
 
-        {/* Overlays (pointer-events-none so they never interfere with video) */}
+        {/* Overlays */}
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
           {cameraState === "idle" && (
             <div className="flex flex-col items-center text-slate-500">
@@ -284,23 +192,17 @@ export default function ScannerCamera({
           {/* Scanning overlay: corner brackets + laser */}
           {cameraState === "scanning" && (
             <>
-              <div className="w-[72%] h-[72%] relative">
-                {/* Corners */}
-                <div className="absolute top-0 left-0 w-6 h-6 border-t-[3px] border-l-[3px] border-emerald-400 rounded-tl-md" />
-                <div className="absolute top-0 right-0 w-6 h-6 border-t-[3px] border-r-[3px] border-emerald-400 rounded-tr-md" />
-                <div className="absolute bottom-0 left-0 w-6 h-6 border-b-[3px] border-l-[3px] border-emerald-400 rounded-bl-md" />
-                <div className="absolute bottom-0 right-0 w-6 h-6 border-b-[3px] border-r-[3px] border-emerald-400 rounded-br-md" />
-
-                {/* Sweeping laser line */}
+              <div className="w-[62%] h-[62%] relative">
+                <div className="absolute top-0 left-0 w-7 h-7 border-t-[3px] border-l-[3px] border-emerald-400 rounded-tl-md" />
+                <div className="absolute top-0 right-0 w-7 h-7 border-t-[3px] border-r-[3px] border-emerald-400 rounded-tr-md" />
+                <div className="absolute bottom-0 left-0 w-7 h-7 border-b-[3px] border-l-[3px] border-emerald-400 rounded-bl-md" />
+                <div className="absolute bottom-0 right-0 w-7 h-7 border-b-[3px] border-r-[3px] border-emerald-400 rounded-br-md" />
                 <div
-                  className="absolute left-[3px] right-[3px] h-[2px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent"
-                  style={{
-                    animation: "scanner-laser 2s ease-in-out infinite",
-                  }}
+                  className="absolute left-[4px] right-[4px] h-[2px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent"
+                  style={{ animation: "scanner-laser 2s ease-in-out infinite" }}
                 />
               </div>
 
-              {/* Scan flash overlay */}
               {scanFlash && (
                 <div className="absolute inset-0 bg-emerald-400/15 rounded-2xl transition-opacity duration-200" />
               )}
@@ -318,26 +220,6 @@ export default function ScannerCamera({
           </div>
         )}
       </div>
-
-      {/* Camera selector — only show if multiple cameras */}
-      {isActive && devices.length > 1 && (
-        <div className="mt-4 w-full max-w-xs mx-auto">
-          <label className="text-[10px] font-bold text-slate-400 block mb-1.5 uppercase tracking-wider text-center">
-            Camera Source
-          </label>
-          <select
-            value={selectedCameraId}
-            onChange={(e) => setSelectedCameraId(e.target.value)}
-            className="w-full bg-[#0a0d14] border border-[#1d2434] text-xs text-slate-300 h-10 rounded-xl px-3 outline-none focus:border-emerald-500 cursor-pointer"
-          >
-            {devices.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.label || `Camera ${d.id.slice(0, 8)}…`}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {/* Start/Stop button */}
       <div className="mt-5 w-full flex justify-center">
@@ -366,11 +248,27 @@ export default function ScannerCamera({
         </Button>
       </div>
 
-      {/* Laser keyframe animation */}
+      {/* Force html5-qrcode video to fill viewport & hide its generated UI controls */}
       <style dangerouslySetInnerHTML={{ __html: `
+        #${elementId} {
+          width: 100% !important;
+          height: 100% !important;
+          border: none !important;
+        }
+        #${elementId} video {
+          object-fit: cover !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+        #${elementId} img,
+        #${elementId} button,
+        #${elementId} select,
+        #${elementId} span {
+          display: none !important;
+        }
         @keyframes scanner-laser {
-          0%, 100% { top: 3px; opacity: 0.6; }
-          50% { top: calc(100% - 5px); opacity: 1; }
+          0%, 100% { top: 4px; opacity: 0.5; }
+          50% { top: calc(100% - 6px); opacity: 1; }
         }
       `}} />
     </div>

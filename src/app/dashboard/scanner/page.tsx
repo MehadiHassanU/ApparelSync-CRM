@@ -417,7 +417,7 @@ export default function ScannerPOSPage() {
                     className="bg-[#0a0d14] border-[#1d2434] rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-200 placeholder-slate-500 w-full focus:border-emerald-500"
                   />
                   {suggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 mt-1 bg-[#111520] border border-[#1d2434] rounded-2xl overflow-hidden z-50 shadow-2xl divide-y divide-[#1d2434]">
+                    <div className="absolute left-0 right-0 mt-1 bg-[#111520] border border-[#1d2434] rounded-2xl overflow-y-auto max-h-[220px] z-50 shadow-2xl divide-y divide-[#1d2434]">
                       {suggestions.map((s) => (
                         <button
                           key={s.id}
