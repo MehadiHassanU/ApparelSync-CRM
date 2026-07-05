@@ -32,11 +32,8 @@ export default function ScannerCamera({
     setCameraState("starting");
     setErrorMessage(null);
 
-    // Initialize scanner
-    const html5Qrcode = new Html5Qrcode(elementId);
-    scannerRef.current = html5Qrcode;
-
     let isMounted = true;
+    let currentScanner: Html5Qrcode | null = null;
 
     const startScanner = async () => {
       // First attempt: Request HD resolution using 'ideal' values
@@ -47,7 +44,10 @@ export default function ScannerCamera({
       };
 
       try {
-        await html5Qrcode.start(
+        currentScanner = new Html5Qrcode(elementId);
+        scannerRef.current = currentScanner;
+
+        await currentScanner.start(
           hdConstraints,
           {
             fps: 25, // scan at 25 frames per second for responsiveness
@@ -76,7 +76,10 @@ export default function ScannerCamera({
 
         // Second attempt: Fallback to basic environment facingMode
         try {
-          await html5Qrcode.start(
+          currentScanner = new Html5Qrcode(elementId);
+          scannerRef.current = currentScanner;
+
+          await currentScanner.start(
             { facingMode: "environment" },
             {
               fps: 25,
@@ -103,7 +106,10 @@ export default function ScannerCamera({
 
           // Third attempt: Fallback to user facingMode (front webcam for laptops)
           try {
-            await html5Qrcode.start(
+            currentScanner = new Html5Qrcode(elementId);
+            scannerRef.current = currentScanner;
+
+            await currentScanner.start(
               { facingMode: "user" },
               {
                 fps: 25,
@@ -149,8 +155,11 @@ export default function ScannerCamera({
     return () => {
       isMounted = false;
       clearTimeout(timer);
-      if (html5Qrcode.isScanning) {
-        html5Qrcode.stop().catch((e) => console.error("Cleanup stop error:", e));
+      if (scannerRef.current) {
+        const scannerInstance = scannerRef.current;
+        if (scannerInstance.isScanning) {
+          scannerInstance.stop().catch((e) => console.error("Cleanup stop error:", e));
+        }
       }
     };
   }, [isActive, onScanSuccess, onScanError, onToggleActive]);
@@ -209,6 +218,7 @@ export default function ScannerCamera({
       <div className="mt-6 w-full flex justify-center">
         <Button
           onClick={onToggleActive}
+          disabled={cameraState === "starting"}
           className={`font-black text-xs px-6 py-3.5 rounded-2xl flex items-center gap-2.5 transition-all cursor-pointer ${
             isActive
               ? "bg-rose-500 hover:bg-rose-400 text-white shadow-lg shadow-rose-500/20"
