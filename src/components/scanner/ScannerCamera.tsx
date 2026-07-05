@@ -72,7 +72,7 @@ export default function ScannerCamera({
           setCameraState("scanning");
         }
       } catch (err: any) {
-        console.warn("Failed to start with HD constraints, retrying with safe fallback...", err);
+        console.warn("Failed to start with HD constraints, retrying with environment fallback...", err);
 
         // Second attempt: Fallback to basic environment facingMode
         try {
@@ -99,11 +99,38 @@ export default function ScannerCamera({
             setCameraState("scanning");
           }
         } catch (fallbackErr: any) {
-          console.error("Camera startup failed completely:", fallbackErr);
-          if (isMounted) {
-            setCameraState("error");
-            setErrorMessage(fallbackErr.message || "Failed to access camera. Check permissions.");
-            onToggleActive(); // Stop request
+          console.warn("Failed to start with environment fallback, retrying with user (front) webcam...", fallbackErr);
+
+          // Third attempt: Fallback to user facingMode (front webcam for laptops)
+          try {
+            await html5Qrcode.start(
+              { facingMode: "user" },
+              {
+                fps: 25,
+                qrbox: (width, height) => {
+                  const min = Math.min(width, height);
+                  const size = min > 0 ? Math.floor(min * 0.75) : 250;
+                  return { width: size, height: size };
+                },
+              },
+              (decodedText) => {
+                console.log("QR Decoded successfully:", decodedText);
+                // Success callback
+                onScanSuccess(decodedText);
+              },
+              (errorMessage) => {
+                if (onScanError) onScanError(errorMessage);
+              }
+            );
+            if (isMounted) {
+              setCameraState("scanning");
+            }
+          } catch (userCamErr: any) {
+            console.error("Camera startup failed completely:", userCamErr);
+            if (isMounted) {
+              setCameraState("error");
+              setErrorMessage(userCamErr.message || "Failed to access camera. Check permissions.");
+            }
           }
         }
       }
