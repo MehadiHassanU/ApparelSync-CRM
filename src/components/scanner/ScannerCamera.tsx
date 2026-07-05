@@ -129,7 +129,12 @@ export default function ScannerCamera({
             console.error("Camera startup failed completely:", userCamErr);
             if (isMounted) {
               setCameraState("error");
-              setErrorMessage(userCamErr.message || "Failed to access camera. Check permissions.");
+              const detailedError = userCamErr instanceof Error
+                ? `${userCamErr.name}: ${userCamErr.message}`
+                : typeof userCamErr === "string"
+                  ? userCamErr
+                  : String(userCamErr);
+              setErrorMessage(detailedError || "Failed to access camera.");
             }
           }
         }
