@@ -40,12 +40,23 @@ export default function ScannerCamera({
 
     const startScanner = async () => {
       try {
-        // Start scanning using back camera or any available camera
+        // Request back camera as preference, with HD resolution targets to maximize QR decoding accuracy
+        const cameraConstraints = {
+          facingMode: "environment",
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 }
+        };
+
         await html5Qrcode.start(
-          { facingMode: "environment" },
+          cameraConstraints,
           {
-            fps: 20,
-            // Omit qrbox to scan the entire frame, improving desktop webcam scan capability
+            fps: 25, // scan at 25 frames per second for ultra responsiveness
+            qrbox: (width, height) => {
+              const min = Math.min(width, height);
+              // Use 75% of the viewport or default to 250px if dimensions aren't resolved yet
+              const size = min > 0 ? Math.floor(min * 0.75) : 250;
+              return { width: size, height: size };
+            },
           },
           (decodedText) => {
             console.log("QR Decoded successfully:", decodedText);
