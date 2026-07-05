@@ -24,11 +24,13 @@ describe("Scanner POS Page Integration Tests", () => {
 
     vi.spyOn(supabase, "from").mockImplementation((table: string) => {
       if (table === "products") {
+        const orChain = {
+          maybeSingle: vi.fn().mockResolvedValue({ data: mockFoundProduct, error: null }),
+          limit: vi.fn().mockResolvedValue({ data: [mockFoundProduct], error: null }),
+        };
         return {
           select: vi.fn().mockReturnValue({
-            or: vi.fn().mockReturnValue({
-              maybeSingle: vi.fn().mockResolvedValue({ data: mockFoundProduct, error: null }),
-            }),
+            or: vi.fn().mockReturnValue(orChain),
           }),
           update: vi.fn().mockReturnValue({
             eq: vi.fn().mockResolvedValue({ error: null }),

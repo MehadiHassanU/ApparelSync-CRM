@@ -27,6 +27,7 @@ export default function ScannerPOSPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isScannerActive, setIsScannerActive] = useState(false);
   const [manualInput, setManualInput] = useState("");
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [loadingProduct, setLoadingProduct] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
   const [scanQuantity, setScanQuantity] = useState(1);
@@ -37,6 +38,75 @@ export default function ScannerPOSPage() {
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [successOrderNum, setSuccessOrderNum] = useState<string | null>(null);
+
+  // Autocomplete fetcher inside useEffect to decouple state updates
+  React.useEffect(() => {
+    if (manualInput.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    const fetchSuggestions = async () => {
+      try {
+        let query = supabase
+          .from("products")
+          .select(`
+            id,
+            name,
+            sku,
+            price,
+            stock_quantity,
+            category_id,
+            barcode,
+            qr_data,
+            created_at,
+            updated_at,
+            category:categories ( name )
+          `)
+          .or(`name.ilike.%${manualInput}%,sku.ilike.%${manualInput}%,barcode.ilike.%${manualInput}%`);
+
+        if (query && typeof (query as any).limit === "function") {
+          query = (query as any).limit(5);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+        if (data) {
+          const mapped: Product[] = data.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            sku: item.sku,
+            price: Number(item.price),
+            stockQuantity: Number(item.stock_quantity),
+            categoryId: item.category_id,
+            categoryName: item.category?.name || "Uncategorized",
+            barcode: item.barcode,
+            qrData: item.qr_data,
+            createdAt: item.created_at,
+            updatedAt: item.updated_at,
+          }));
+          setSuggestions(mapped);
+        }
+      } catch (err) {
+        console.error("Suggestions fetch error:", err);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      fetchSuggestions();
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [manualInput]);
+
+  const handleSelectSuggestion = (prod: Product) => {
+    setScannedProduct(prod);
+    setScanQuantity(1);
+    setSuggestions([]);
+    setManualInput("");
+    setErrorMsg(null);
+  };
 
   // ─── Search / Lookup Product ───────────────────────────────────────────────
   const lookupProduct = useCallback(async (value: string, isFromQR = false) => {
@@ -324,9 +394,33 @@ export default function ScannerPOSPage() {
                     type="text"
                     value={manualInput}
                     onChange={(e) => setManualInput(e.target.value)}
+                    onBlur={() => setTimeout(() => setSuggestions([]), 200)}
                     placeholder="Enter product SKU or barcode..."
                     className="bg-[#0a0d14] border-[#1d2434] rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-200 placeholder-slate-500 w-full focus:border-emerald-500"
                   />
+                  {suggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 mt-1 bg-[#111520] border border-[#1d2434] rounded-2xl overflow-hidden z-50 shadow-2xl divide-y divide-[#1d2434]">
+                      {suggestions.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onMouseDown={() => handleSelectSuggestion(s)}
+                          className="w-full text-left px-4 py-3 hover:bg-[#1c2333] transition-colors flex items-center justify-between text-xs cursor-pointer border-0 outline-none"
+                        >
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-bold text-white">{s.name}</span>
+                            <span className="font-mono text-slate-400 text-[10px] uppercase">
+                              SKU: {s.sku} | Barcode: {s.barcode || "N/A"}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-black text-emerald-400">${s.price.toFixed(2)}</span>
+                            <div className="text-[9px] text-slate-500 font-bold">Stock: {s.stockQuantity}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <Button
                   type="submit"

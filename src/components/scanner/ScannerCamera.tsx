@@ -25,13 +25,7 @@ export default function ScannerCamera({
 
   useEffect(() => {
     if (!isActive) {
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        scannerRef.current.stop().then(() => {
-          setCameraState("idle");
-        }).catch((err) => {
-          console.error("Error stopping scanner:", err);
-        });
-      }
+      setCameraState("idle");
       return;
     }
 
@@ -41,6 +35,8 @@ export default function ScannerCamera({
     // Initialize scanner
     const html5Qrcode = new Html5Qrcode(elementId);
     scannerRef.current = html5Qrcode;
+
+    let isMounted = true;
 
     const startScanner = async () => {
       try {
@@ -63,12 +59,16 @@ export default function ScannerCamera({
             if (onScanError) onScanError(errorMessage);
           }
         );
-        setCameraState("scanning");
+        if (isMounted) {
+          setCameraState("scanning");
+        }
       } catch (err: any) {
         console.error("Failed to start camera scanner:", err);
-        setCameraState("error");
-        setErrorMessage(err.message || "Failed to access camera. Check permissions.");
-        onToggleActive(); // Stop request
+        if (isMounted) {
+          setCameraState("error");
+          setErrorMessage(err.message || "Failed to access camera. Check permissions.");
+          onToggleActive(); // Stop request
+        }
       }
     };
 
@@ -78,6 +78,7 @@ export default function ScannerCamera({
     }, 300);
 
     return () => {
+      isMounted = false;
       clearTimeout(timer);
       if (html5Qrcode.isScanning) {
         html5Qrcode.stop().catch((e) => console.error("Cleanup stop error:", e));
