@@ -21,6 +21,7 @@ export default function ScannerCamera({
   const [cameraState, setCameraState] = useState<"idle" | "starting" | "scanning" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const lastScannedRef = useRef<{ text: string, time: number } | null>(null);
   const elementId = "pos-qr-reader";
 
   useEffect(() => {
@@ -55,6 +56,26 @@ export default function ScannerCamera({
         }
       };
 
+      // Throttled scan processor to avoid database lookup floods
+      const handleDecodedText = (decodedText: string) => {
+        const now = Date.now();
+        const last = lastScannedRef.current;
+
+        // 1. Same item scan throttle (2.5 seconds)
+        if (last && last.text === decodedText && now - last.time < 2500) {
+          return;
+        }
+
+        // 2. Global scan throttle (1.2 seconds between any scans)
+        if (last && now - last.time < 1200) {
+          return;
+        }
+
+        lastScannedRef.current = { text: decodedText, time: now };
+        console.log("QR Decoded successfully (throttled):", decodedText);
+        onScanSuccess(decodedText);
+      };
+
       try {
         currentScanner = new Html5Qrcode(elementId);
         scannerRef.current = currentScanner;
@@ -62,15 +83,18 @@ export default function ScannerCamera({
         await currentScanner.start(
           idealConstraints,
           scanConfig,
-          (decodedText) => {
-            console.log("QR Decoded successfully:", decodedText);
-            // Success callback
-            onScanSuccess(decodedText);
-          },
+          handleDecodedText,
           (errorMessage) => {
             if (onScanError) onScanError(errorMessage);
           }
         );
+
+        if (!isMounted) {
+          console.log("Component unmounted while scanner was starting (attempt 1), shutting down stream...");
+          currentScanner.stop().catch(() => {});
+          return;
+        }
+
         if (isMounted) {
           setCameraState("scanning");
         }
@@ -85,14 +109,18 @@ export default function ScannerCamera({
           await currentScanner.start(
             { facingMode: "environment" },
             scanConfig,
-            (decodedText) => {
-              console.log("QR Decoded successfully:", decodedText);
-              onScanSuccess(decodedText);
-            },
+            handleDecodedText,
             (errorMessage) => {
               if (onScanError) onScanError(errorMessage);
             }
           );
+
+          if (!isMounted) {
+            console.log("Component unmounted while scanner was starting (attempt 2), shutting down stream...");
+            currentScanner.stop().catch(() => {});
+            return;
+          }
+
           if (isMounted) {
             setCameraState("scanning");
           }
@@ -107,14 +135,18 @@ export default function ScannerCamera({
             await currentScanner.start(
               { facingMode: "user" },
               scanConfig,
-              (decodedText) => {
-                console.log("QR Decoded successfully:", decodedText);
-                onScanSuccess(decodedText);
-              },
+              handleDecodedText,
               (errorMessage) => {
                 if (onScanError) onScanError(errorMessage);
               }
             );
+
+            if (!isMounted) {
+              console.log("Component unmounted while scanner was starting (attempt 3), shutting down stream...");
+              currentScanner.stop().catch(() => {});
+              return;
+            }
+
             if (isMounted) {
               setCameraState("scanning");
             }
