@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { Product, CartItem, QRPayload } from "@/lib/types";
+import { Product, CartItem } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
