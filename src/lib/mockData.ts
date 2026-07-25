@@ -30,7 +30,7 @@ export interface Order {
 export const kpiMetrics: KPIMetrics = {
   totalRevenue: {
     value: 0,
-    formattedValue: "$0.00",
+    formattedValue: "৳0.00",
     percentageChange: 0,
     isPositive: true,
   },
@@ -42,7 +42,7 @@ export const kpiMetrics: KPIMetrics = {
   },
   netProfit: {
     value: 0,
-    formattedValue: "$0.00",
+    formattedValue: "৳0.00",
     percentageChange: 0,
     isPositive: true,
   },

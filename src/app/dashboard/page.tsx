@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Order, OrderStatus } from "../../lib/mockData";
 import { supabase } from "../../lib/supabaseClient";
+import { formatCurrency } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -20,6 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import CustomerPicker from "@/components/customers/CustomerPicker";
 import {
   Dialog,
   DialogContent,
@@ -120,6 +122,7 @@ export default function Dashboard() {
 
   // Form states for adding new order
   const [newCustomer, setNewCustomer] = useState("");
+  const [newCustomerId, setNewCustomerId] = useState<string | null>(null);
   const [newCategory, setNewCategory] = useState("Apparel");
   const [newPrice, setNewPrice] = useState("");
   const [newPayment, setNewPayment] = useState("PayPal");
@@ -156,7 +159,7 @@ export default function Dashboard() {
           customerId: item.customer_id,
           category: "Apparel", // Default category representation
           price: Number(item.total),
-          formattedPrice: `$${Number(item.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+          formattedPrice: formatCurrency(Number(item.total)),
           date: item.sale_date ? new Date(item.sale_date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
           paymentMethod: item.payment_method,
           status: (item.status as OrderStatus) || "delivered",
@@ -183,7 +186,7 @@ export default function Dashboard() {
 
     return {
       totalRevenue: {
-        formattedValue: `$${totalRev.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        formattedValue: formatCurrency(totalRev),
         value: totalRev,
       },
       totalOrders: {
@@ -191,7 +194,7 @@ export default function Dashboard() {
         value: totalOrd,
       },
       netProfit: {
-        formattedValue: `$${netProf.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        formattedValue: formatCurrency(netProf),
         value: netProf,
       },
     };
@@ -253,25 +256,28 @@ export default function Dashboard() {
 
     setIsSubmitting(true);
     try {
-      // 1. Find or create Customer in Supabase
-      let customerId = null;
-      const { data: existingCust } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("full_name", newCustomer.trim())
-        .maybeSingle();
+      // 1. Resolve customer id — skip DB lookup when picker already gave us one
+      let customerId: string | null = newCustomerId;
 
-      if (existingCust) {
-        customerId = existingCust.id;
-      } else {
-        const { data: newCust, error: custErr } = await supabase
+      if (!customerId) {
+        const { data: existingCust } = await supabase
           .from("customers")
-          .insert([{ full_name: newCustomer.trim() }])
           .select("id")
-          .single();
+          .eq("full_name", newCustomer.trim())
+          .maybeSingle();
 
-        if (custErr) throw custErr;
-        if (newCust) customerId = newCust.id;
+        if (existingCust) {
+          customerId = existingCust.id;
+        } else {
+          const { data: newCust, error: custErr } = await supabase
+            .from("customers")
+            .insert([{ full_name: newCustomer.trim() }])
+            .select("id")
+            .single();
+
+          if (custErr) throw custErr;
+          if (newCust) customerId = newCust.id;
+        }
       }
 
       // 2. Insert Sale into Supabase
@@ -293,6 +299,7 @@ export default function Dashboard() {
 
       // Reset form & reload live data
       setNewCustomer("");
+      setNewCustomerId(null);
       setNewPrice("");
       setIsAddDialogOpen(false);
       await fetchSalesFromSupabase();
@@ -587,12 +594,19 @@ export default function Dashboard() {
                   <form onSubmit={handleAddOrder} className="space-y-4 pt-3">
                     <div>
                       <label className="text-xs font-bold text-slate-300 block mb-1.5">Customer Name</label>
-                      <Input
-                        required
+                      <CustomerPicker
                         value={newCustomer}
-                        onChange={(e) => setNewCustomer(e.target.value)}
+                        onChange={(name) => {
+                          setNewCustomer(name);
+                          setNewCustomerId(null);
+                        }}
+                        onSelect={(id, name) => {
+                          setNewCustomerId(id);
+                          setNewCustomer(name);
+                        }}
+                        onClear={() => setNewCustomerId(null)}
                         placeholder="e.g. Sarah Jenkins"
-                        className="bg-[#0a0d14] border-[#1d2434] text-xs text-white h-10 rounded-xl"
+                        inputClassName="bg-[#0a0d14] border-[#1d2434] text-xs text-white h-10 rounded-xl"
                       />
                     </div>
                     <div>

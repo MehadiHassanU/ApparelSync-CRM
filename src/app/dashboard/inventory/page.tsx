@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Product, Category } from "@/lib/types";
+import { formatCurrency } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -362,7 +363,7 @@ export default function InventoryPage() {
             ${svgHtml}
             <h2>${selectedProduct?.name}</h2>
             <p>SKU: ${selectedProduct?.sku}</p>
-            <p>Price: $${selectedProduct?.price.toFixed(2)}</p>
+            <p>Price: ${formatCurrency(selectedProduct?.price ?? 0)}</p>
           </div>
         </body>
       </html>
@@ -519,7 +520,7 @@ export default function InventoryPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-300 block mb-1.5">Price ($)</label>
+                    <label className="text-xs font-bold text-slate-300 block mb-1.5">Price (৳)</label>
                     <Input
                       required
                       type="number"
@@ -716,7 +717,7 @@ export default function InventoryPage() {
                           {prod.categoryName}
                         </Badge>
                       </TableCell>
-                      <TableCell className="px-5 py-4 font-black text-white text-sm">${prod.price.toFixed(2)}</TableCell>
+                      <TableCell className="px-5 py-4 font-black text-white text-sm">{formatCurrency(prod.price)}</TableCell>
                       <TableCell className="px-5 py-4">
                         <span className={`text-sm font-black ${isLowStock ? "text-amber-400" : "text-white"}`}>
                           {prod.stockQuantity}
@@ -802,7 +803,7 @@ export default function InventoryPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1.5">Price ($)</label>
+                  <label className="text-xs font-bold text-slate-300 block mb-1.5">Price (৳)</label>
                   <Input
                     required
                     type="number"
@@ -862,7 +863,7 @@ export default function InventoryPage() {
             <div className="text-center mt-4">
               <h3 className="font-extrabold text-base text-white">{selectedProduct.name}</h3>
               <p className="font-mono text-xs text-emerald-400 mt-1">SKU: {selectedProduct.sku}</p>
-              <p className="font-black text-sm text-slate-300 mt-0.5">Price: ${selectedProduct.price.toFixed(2)}</p>
+              <p className="font-black text-sm text-slate-300 mt-0.5">Price: {formatCurrency(selectedProduct.price)}</p>
             </div>
             <DialogFooter className="pt-4">
               <Button onClick={printQrCode} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl h-10 w-full flex items-center justify-center gap-2">
