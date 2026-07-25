@@ -24,7 +24,7 @@ const navItems = [
   { label: "Scanner", href: "/dashboard/scanner", icon: ScanLine },
   { label: "Reports", href: "#", icon: FileText },
   { label: "Revenue", href: "#", icon: TrendingUp },
-  { label: "Customers", href: "#", icon: Contact },
+  { label: "Customers", href: "/dashboard/customers", icon: Contact },
   { label: "Settings", href: "#", icon: Settings },
 ];
 

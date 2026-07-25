@@ -19,6 +19,35 @@ export interface Category {
   name: string;
 }
 
+// ─── Customer & Profile Types ────────────────────────────────────────────────
+
+export interface Customer {
+  id: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Computed metrics for customer intelligence
+  totalOrders?: number;
+  totalSpent?: number;
+  lastOrderDate?: string | null;
+  averageOrderValue?: number;
+}
+
+export interface CustomerOrderHistory {
+  id: string;
+  orderNumber: string;
+  total: number;
+  paymentMethod: string;
+  status: string;
+  createdAt: string;
+  itemsCount?: number;
+}
+
 // ─── Scanner & Cart Types ────────────────────────────────────────────────────
 
 export interface CartItem {
@@ -62,6 +91,18 @@ export interface CategoryRow {
   id: string;
   name: string;
   created_at: string;
+}
+
+export interface CustomerRow {
+  id: string;
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SaleItemRow {
