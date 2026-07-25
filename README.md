@@ -1,137 +1,134 @@
 # ApparelSync-CRM — Clothing Retail Shop POS & CRM Suite
 
-ApparelSync-CRM is a Customer Relationship Management (CRM) and Point of Sale (POS) system designed for retail apparel businesses. Built with **Next.js 14 (App Router)**, **Tailwind CSS**, and **Supabase (PostgreSQL)**, it streamlines inventory management, customer profiling, and sales checkouts.
+ApparelSync-CRM is a modern, high-performance Customer Relationship Management (CRM) and Point of Sale (POS) system built for clothing and retail apparel businesses. Powered by **Next.js 14 (App Router)**, **Tailwind CSS**, and **Supabase (PostgreSQL)**, it streamlines inventory management, live camera QR scanning, customer profiling, lifetime value (LTV) analytics, and POS transactions.
 
 ---
 
 ## 🚀 Tech Stack
 
-- **Frontend Framework:** Next.js 14 (React 18)
-- **Styling:** Tailwind CSS (Dark Mode Design System)
-- **Backend / Database:** Supabase (PostgreSQL)
-- **UI Components:** `@base-ui/react` (Shadcn/ui base-nova design primitives)
+- **Frontend Framework:** Next.js 14 (React 18, App Router)
+- **Styling & Aesthetics:** Tailwind CSS (Dark Mode Design System)
+- **Backend & Database:** Supabase (PostgreSQL with RLS policies)
+- **UI Component System:** `@base-ui/react` (Shadcn/ui base-nova design primitives)
 - **QR / Barcode Scanning:** `html5-qrcode` & `qrcode.react`
-- **Charts / Visualizations:** Recharts
+- **Charts & Data Visualization:** Recharts
 - **Testing Suite:** Vitest + JSDOM + `@testing-library/react`
 
 ---
 
 ## 📊 Feature Implementation Status (10 User Stories)
 
-Here is the master roadmap tracking what has been built and what is planned. Use this section to align with other developers or Agentic AIs.
+Here is the master roadmap tracking what has been built and what is available for team extension.
 
 ### Scorecard Summary
-- **User Stories Completed:** 2 / 10
-- **User Stories Partially Completed:** 2 / 10
-- **User Stories Not Started:** 6 / 10
+- **User Stories Completed:** 5 / 10
+- **User Stories Partially Completed:** 1 / 10
+- **User Stories Not Started:** 4 / 10
 
 ---
 
-### Phase 1: Completed / In Progress 🚧
+### Completed Features ✅
 
 #### 1. Product Inventory CRUD (User Story 1) — ✅ **COMPLETED**
-- **Status:** Fully Implemented.
-- **Details:** Full CRUD operations on `products` table. Includes sorting, searching, and filtering by category. Warning alerts display automatically on low-stock items (quantity &le; 5).
+- **Details:** Full CRUD operations on the `products` table. Includes search, category filtering, auto-SKU generation, and low-stock warning badges (stock &le; 5).
 - **Location:** [src/app/dashboard/inventory/page.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/inventory/page.tsx)
-- **Database Schema:** `products` and `categories` tables (see `supabase/migration.sql`).
 
-#### 2. Barcode/QR Scanning (User Story 2) — ✅ **COMPLETED**
-- **Status:** Fully Implemented.
-- **Details:** Camera scanner captures product QR codes, parses JSON payloads, retrieves product details from the database, and adds them to a shopping cart. Supports manual SKU/barcode lookup fallback. Complete POS Checkout records the sale, creates line item logs, and decrements stock quantity.
-- **Location:** [src/app/dashboard/scanner/page.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/scanner/page.tsx) & [src/components/scanner/ScannerCamera.tsx](file:///n:/app_sync/ApparelSync-CRM/src/components/scanner/ScannerCamera.tsx).
+#### 2. Live Barcode/QR POS Scanner (User Story 2) — ✅ **COMPLETED**
+- **Details:** Responsive web camera QR scanner using low-density plain SKU strings for fast decode on webcams. Supports manual SKU/barcode search, cross-browser Web Audio scan beep, instant cart building, and printable ticket-style receipts.
+- **Location:** [src/app/dashboard/scanner/page.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/scanner/page.tsx) & [src/components/scanner/ScannerCamera.tsx](file:///n:/app_sync/ApparelSync-CRM/src/components/scanner/ScannerCamera.tsx)
 
-#### 3. Invoice Generation (User Story 3) — ❌ **NOT STARTED**
-- **Requirements:** Generate invoice numbers on checkout, build invoice details display, download invoices as PDF, and store records.
-- **Next steps for AI:** Create invoice schema, build Invoice details preview modal, and install/integrate a PDF generation library (like `jspdf` or `react-pdf`).
+#### 3. Automatic Inventory Stock Deductions (User Story 4) — ✅ **COMPLETED**
+- **Details:** POS checkout automatically runs atomic stock deductions (`stock_quantity = stock_quantity - item.quantity`) in Supabase.
+- **Location:** `handleCheckout` in [scanner/page.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/scanner/page.tsx)
 
-#### 4. Automatic Inventory Deductions (User Story 4) — ✅ **COMPLETED**
-- **Status:** Fully Implemented.
-- **Details:** Sales checkouts on the Scanner page automatically run stock deduction queries (`stock_quantity = stock_quantity - quantity`) in the database.
-- **Location:** `handleCheckout` in [scanner/page.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/scanner/page.tsx).
+#### 4. Customer Profiles & LTV Intelligence (User Story 6) — ✅ **COMPLETED**
+- **Details:** Dedicated Customer Profiles module at `/dashboard/customers`. Records customer name, phone, email, address, city, and notes. Tracks cumulative Customer Lifetime Value (LTV), order counts, and returning customer ratios. Includes autocomplete integration in POS checkout.
+- **Location:** [src/app/dashboard/customers/page.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/customers/page.tsx)
 
-#### 5. Low-Stock Alerts (User Story 5) — ⚠️ **PARTIAL**
-- **Status:** UI indicator built; automation remains.
-- **Details:** Inventory page marks products with stock &le; 5 with an amber warning badge.
-- **Next steps for AI:** Allow the admin to configure custom stock threshold levels per product, and display low stock notifications dynamically on the main Dashboard.
+#### 5. Customer Purchase History Timeline (User Story 8) — ✅ **COMPLETED**
+- **Details:** Slide-over customer profile drawer rendering full transactional order history linked via `customer_id`. Displays order numbers, dates, payment modes, total spent, and status badges.
+- **Location:** `viewCustomer` drawer in [customers/page.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/customers/page.tsx)
 
 ---
 
-### Phase 2: Pending backlog 📋
+### In Progress / Partially Built 🚧
 
-#### 6. Customer Profiles (User Story 6) — ⚠️ **PARTIAL**
-- **Status:** Database support present; UI missing.
-- **Details:** `customers` table exists and matches profiles to orders.
-- **Next steps for AI:** Build dedicated `/dashboard/customers` profile page with forms to record customer phone number, email address, and home address.
+#### 6. Low-Stock Alerts (User Story 5) — ⚠️ **PARTIAL**
+- **Details:** Inventory page flags products with stock &le; 5 with amber warning badges.
+- **Next steps:** Add configurable per-product thresholds and top banner notifications on the main Dashboard.
 
-#### 7. Loyalty Points System (User Story 7) — ❌ **NOT STARTED**
-- **Requirements:** Auto-calculate loyalty points during checkouts and link balances to customer profiles.
-- **Next steps for AI:** Add `loyalty_points` integer field to `customers` table and integrate point accumulation logic in checkout queries.
+---
 
-#### 8. Purchase Histories (User Story 8) — ❌ **NOT STARTED**
-- **Requirements:** Search customers by name/phone to pull transactional purchase history.
-- **Next steps for AI:** Build purchase history timeline panel inside Customer profiles.
+### Pending Backlog (Ready for Team Extension) 📋
 
-#### 9. Sales Reports & Analytics (User Story 9) — ❌ **NOT STARTED**
-- **Requirements:** Summary dashboard reports, top-selling products donut charts derived from real database transactions, and PDF exports.
-- **Next steps for AI:** Replace static categories donut chart with live dynamic calculations, and create a PDF export button for daily reports.
+Teammates (Safin, Uthso, etc.) can build directly on top of the Customer Profiles and Sales schema for the following upcoming features:
 
-#### 10. Email Invoices (User Story 10) — ❌ **NOT STARTED**
-- **Requirements:** Send digital copy of checkout invoices to customer email addresses.
-- **Next steps for AI:** Integrate mail relay service (like SendGrid, Resend, or Nodemailer).
+#### 7. Loyalty Points & Rewards System (User Story 7)
+- **Extending Customer Profiles:** Add a `loyalty_points` integer field to the `customers` table (e.g. 1 point per $10 spent). Auto-increment points in POS `handleCheckout` and display point balances on customer profiles.
+
+#### 8. Sales Reports & Business Insights (User Story 9)
+- **Extending Analytics:** Leverage aggregated `sales` and `customers` LTV data to build top-buyer leaderboards, monthly revenue trends, and sales category charts on `/dashboard`.
+
+#### 9. Invoice Generation & PDF Exports (User Story 3)
+- **Extending Receipts:** Render printable PDF invoices using `jspdf` or `html2pdf` from POS checkout receipts or order records.
+
+#### 10. Digital Email Invoices (User Story 10)
+- **Extending Communications:** Use the customer `email` field captured in Customer Profiles to send digital PDF receipts after checkout using an email provider (Resend, SendGrid, or Nodemailer).
+
+---
+
+## 👥 Team Branching Strategy
+
+The repository follows a clean, single-main team workflow:
+
+- `main`: Production-ready branch containing merged and tested code.
+- `Nafis`: Customer Profiles, Purchase History, POS Autocomplete, and schema enhancements.
+- `Safin`: Assigned feature workspace branch.
+- `Uthso`: Assigned feature workspace branch.
+
+### Teammate Workflow
+1. Switch to your designated branch: `git checkout <YourName>`
+2. Pull latest from main: `git pull origin main`
+3. Commit and push your changes: `git push origin <YourName>`
 
 ---
 
 ## 🛠️ Developer Setup & Commands
 
 ### Prerequisites
-Make sure you have Node.js 20+ installed.
+Node.js 20+ installed.
 
 ### Installation
 ```bash
 npm install
 ```
 
-### Database Migration
-Before running the POS or Inventory pages, apply the database schema. Copy the contents of [supabase/migration.sql](file:///n:/app_sync/ApparelSync-CRM/supabase/migration.sql) and execute it inside your Supabase project's SQL Editor.
+### Database Migrations
+Apply SQL migration scripts in order from `supabase/migrations/`:
+1. `20260705172127_init_schema.sql` (Products, Categories, Sales, Sale Items)
+2. `20260726000000_enhance_customers_schema.sql` (Customer Profiles schema)
 
 ### Running Locally
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) to view the application.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Running Tests
-To verify all integrations and mocks:
+### Running Test Suite
 ```bash
 npm test
 ```
 
 ### Production Build
-To run TypeScript compilation and compile optimized static pages:
 ```bash
 npm run build
 ```
 
 ---
 
-## 🤖 Instructions for AI Coding Agents
+## 📜 License & Credit Attribution
 
-When working on this repository, please observe the following structural patterns:
+This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)** - see the [LICENSE](file:///n:/app_sync/ApparelSync-CRM/LICENSE) file for full details.
 
-1. **Routing and Layouts:**
-   - The sidebar resides in [Sidebar.tsx](file:///n:/app_sync/ApparelSync-CRM/src/components/layout/Sidebar.tsx). Do not hardcode navigation bars inside individual pages.
-   - Pages under `/dashboard/*` are automatically wrapped by [layout.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/layout.tsx).
-
-2. **Supabase Operations:**
-   - Make client-side queries directly using the exported `supabase` client from `@/lib/supabaseClient`.
-   - Always run operations inside try/catch blocks with console logs and UI error alerts.
-
-3. **Styling Rules:**
-   - Background colors must be `#0a0d14` (page bg) and `#111520` (card bg).
-   - Component borders must be `#1d2434`.
-   - Hover elements should use emerald/teal accents.
-   - Design exclusively for dark-mode layout.
-
-4. **Testing Rules:**
-   - Any new page or database service should have a corresponding `.test.tsx` or `.test.ts` file.
-   - Mock Supabase calls using `vi.spyOn(supabase, 'from')`. Do not trigger real database requests in unit tests.
+### Commercial & Public Use Terms
+ApparelSync-CRM is open-source. Anyone is free to use, modify, and distribute this software for personal or commercial purposes under the GNU GPL v3.0 license, provided that **attribution credit is given to the original authors** (ApparelSync CRM Team: **Mehadi Hassan Uthso, Nafis, Safin**).
