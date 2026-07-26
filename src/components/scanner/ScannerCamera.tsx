@@ -53,10 +53,18 @@ export default function ScannerCamera({
     setCameraState("starting");
     setErrorMessage(null);
 
-    // Create a fresh instance if needed
+    // Create a fresh instance configured for 1D Barcodes + QR fallback
     if (!scannerRef.current) {
       scannerRef.current = new Html5Qrcode(elementId, {
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.QR_CODE,
+        ],
         verbose: false,
       });
       readerReady.current = false;
@@ -66,7 +74,11 @@ export default function ScannerCamera({
       try {
         await scannerRef.current.start(
           { facingMode: "environment" },
-          { fps: 12, qrbox: { width: 240, height: 240 }, disableFlip: true },
+          {
+            fps: 12,
+            qrbox: { width: 280, height: 160 }, // Rectangular viewport optimized for 1D linear barcodes
+            disableFlip: true,
+          },
           (decoded) => {
             if (lockRef.current) return;
 
@@ -97,7 +109,7 @@ export default function ScannerCamera({
               lockRef.current = false;
             }, 1500);
           },
-          () => {} // silence per-frame "no QR found"
+          () => {} // silence per-frame "no barcode found"
         );
         readerReady.current = true;
         setCameraState("scanning");
@@ -121,7 +133,6 @@ export default function ScannerCamera({
   // ── Lifecycle: start/stop based on isActive ─────────────────────────────────
   useEffect(() => {
     if (isActive) {
-      // Small delay to ensure the DOM container is rendered
       const timer = setTimeout(() => startCamera(), 150);
       return () => clearTimeout(timer);
     } else {
@@ -154,7 +165,7 @@ export default function ScannerCamera({
               : "border-slate-700/60 border-dashed"
         } bg-black relative flex items-center justify-center transition-all duration-200`}
       >
-        {/* html5-qrcode mounts its own video/canvas here — never put React children inside */}
+        {/* html5-qrcode mounts its own video/canvas here */}
         <div id={elementId} />
 
         {/* Overlays */}
@@ -169,7 +180,7 @@ export default function ScannerCamera({
           {cameraState === "starting" && (
             <div className="flex flex-col items-center text-emerald-400">
               <Loader2 className="w-10 h-10 animate-spin mb-3" />
-              <span className="text-[11px] font-bold uppercase tracking-wider">Starting Camera…</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">Starting Barcode Scanner…</span>
             </div>
           )}
 
@@ -189,17 +200,17 @@ export default function ScannerCamera({
             </div>
           )}
 
-          {/* Scanning overlay: corner brackets + laser */}
+          {/* Scanning overlay: rectangular 1D Barcode sweep frame */}
           {cameraState === "scanning" && (
             <>
-              <div className="w-[62%] h-[62%] relative">
+              <div className="w-[82%] h-[48%] relative">
                 <div className="absolute top-0 left-0 w-7 h-7 border-t-[3px] border-l-[3px] border-emerald-400 rounded-tl-md" />
                 <div className="absolute top-0 right-0 w-7 h-7 border-t-[3px] border-r-[3px] border-emerald-400 rounded-tr-md" />
                 <div className="absolute bottom-0 left-0 w-7 h-7 border-b-[3px] border-l-[3px] border-emerald-400 rounded-bl-md" />
                 <div className="absolute bottom-0 right-0 w-7 h-7 border-b-[3px] border-r-[3px] border-emerald-400 rounded-br-md" />
                 <div
                   className="absolute left-[4px] right-[4px] h-[2px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent"
-                  style={{ animation: "scanner-laser 2s ease-in-out infinite" }}
+                  style={{ animation: "scanner-laser 1.8s ease-in-out infinite" }}
                 />
               </div>
 
@@ -215,7 +226,7 @@ export default function ScannerCamera({
           <div className="absolute bottom-2 left-2 right-2 z-20 pointer-events-none">
             <div className="bg-emerald-500/90 backdrop-blur-sm text-slate-950 text-[10px] font-black px-3 py-1.5 rounded-lg flex items-center gap-1.5 justify-center">
               <Zap className="w-3 h-3" />
-              Last scan: {lastScannedLabel}
+              Last barcode: {lastScannedLabel}
             </div>
           </div>
         )}
@@ -242,13 +253,13 @@ export default function ScannerCamera({
             </>
           ) : (
             <>
-              <Camera className="w-4 h-4" /> Start Scanner
+              <Camera className="w-4 h-4" /> Start Barcode Scanner
             </>
           )}
         </Button>
       </div>
 
-      {/* Force html5-qrcode video to fill viewport & hide its generated UI controls */}
+      {/* Force html5-qrcode video to fill viewport & hide library UI controls */}
       <style dangerouslySetInnerHTML={{ __html: `
         #${elementId} {
           width: 100% !important;

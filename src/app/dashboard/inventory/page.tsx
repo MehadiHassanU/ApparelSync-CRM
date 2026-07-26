@@ -53,7 +53,7 @@ import {
   MoreHorizontal,
   X,
 } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import BarcodeView from "@/components/inventory/BarcodeView";
 
 export default function InventoryPage() {
   // ─── States ────────────────────────────────────────────────────────────────
@@ -334,16 +334,14 @@ export default function InventoryPage() {
   const printQrCode = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
-    
-    const qrSvgElement = document.getElementById("qr-code-svg-element");
-    if (!qrSvgElement) return;
 
-    const svgHtml = qrSvgElement.outerHTML;
+    const barcodeSvgElement = document.querySelector(".bg-white svg");
+    const svgHtml = barcodeSvgElement ? barcodeSvgElement.outerHTML : "";
 
     printWindow.document.write(`
       <html>
         <head>
-          <title>Print QR Code - ${selectedProduct?.name}</title>
+          <title>Print Barcode - ${selectedProduct?.name}</title>
           <style>
             body {
               display: flex;
@@ -356,12 +354,14 @@ export default function InventoryPage() {
             }
             .container {
               text-align: center;
-              border: 1px solid #ccc;
-              padding: 20px;
-              border-radius: 10px;
+              border: 2px dashed #000;
+              padding: 24px;
+              border-radius: 12px;
+              width: 320px;
             }
-            h2 { margin: 10px 0 5px 0; }
-            p { margin: 0; color: #666; font-family: monospace; }
+            h2 { margin: 12px 0 4px 0; font-size: 18px; }
+            p { margin: 2px 0; color: #444; font-family: monospace; font-size: 13px; }
+            .price { font-weight: bold; font-size: 15px; color: #000; margin-top: 6px; }
           </style>
         </head>
         <body onload="window.print(); window.close();">
@@ -369,7 +369,7 @@ export default function InventoryPage() {
             ${svgHtml}
             <h2>${selectedProduct?.name}</h2>
             <p>SKU: ${selectedProduct?.sku}</p>
-            <p>Price: ${formatCurrency(selectedProduct?.price ?? 0)}</p>
+            <p class="price">Price: ${formatCurrency(selectedProduct?.price ?? 0)}</p>
           </div>
         </body>
       </html>
@@ -882,29 +882,27 @@ export default function InventoryPage() {
         </Dialog>
       )}
 
-      {/* QR Code Modal */}
+      {/* Barcode Label Modal */}
       {selectedProduct && isQrOpen && (
         <Dialog open={isQrOpen} onOpenChange={setIsQrOpen}>
           <DialogContent className="bg-[#111520] border-[#1d2434] text-white rounded-3xl p-6 max-w-sm">
             <DialogHeader>
-              <DialogTitle className="text-xl font-extrabold text-white text-center">Product QR Badge</DialogTitle>
+              <DialogTitle className="text-xl font-extrabold text-white text-center flex items-center justify-center gap-2">
+                <Barcode className="w-5 h-5 text-emerald-400" />
+                Product Barcode Label
+              </DialogTitle>
             </DialogHeader>
-            <div className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl mt-4">
-              <QRCodeSVG
-                id="qr-code-svg-element"
-                value={selectedProduct.sku}
-                size={200}
-                level="M"
-              />
+            <div className="flex flex-col items-center justify-center mt-3">
+              <BarcodeView value={selectedProduct.sku} width={2} height={70} className="w-full" />
             </div>
-            <div className="text-center mt-4">
+            <div className="text-center mt-3">
               <h3 className="font-extrabold text-base text-white">{selectedProduct.name}</h3>
               <p className="font-mono text-xs text-emerald-400 mt-1">SKU: {selectedProduct.sku}</p>
               <p className="font-black text-sm text-slate-300 mt-0.5">Price: {formatCurrency(selectedProduct.price)}</p>
             </div>
             <DialogFooter className="pt-4">
               <Button onClick={printQrCode} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl h-10 w-full flex items-center justify-center gap-2">
-                <Printer className="w-4 h-4" /> Print QR Badge
+                <Printer className="w-4 h-4" /> Print Barcode Label
               </Button>
             </DialogFooter>
           </DialogContent>
