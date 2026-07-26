@@ -154,10 +154,14 @@ export default function InventoryPage() {
     fetchInventoryData();
   }, [fetchInventoryData]);
 
-  // ─── Helper: Generate SKU ──────────────────────────────────────────────────
+  // ─── Helper: Generate SKU & Barcode ───────────────────────────────────────────
   const generateSku = () => {
     const random = Math.floor(100000 + Math.random() * 900000);
-    setProdSku(`AP-${random}`);
+    const skuCode = `AP-${random}`;
+    setProdSku(skuCode);
+    if (!prodBarcode) {
+      setProdBarcode(`893000${random}`);
+    }
   };
 
   // ─── CRUD: Add Product ──────────────────────────────────────────────────────
@@ -169,8 +173,9 @@ export default function InventoryPage() {
     try {
       const priceNum = parseFloat(prodPrice);
       const stockNum = parseInt(prodStock, 10);
+      const finalBarcode = prodBarcode.trim() || prodSku.trim();
 
-      // Insert product
+      // Insert product with auto-assigned barcode
       const { data: newProd, error: insertErr } = await supabase
         .from("products")
         .insert([
@@ -180,7 +185,8 @@ export default function InventoryPage() {
             price: priceNum,
             stock_quantity: stockNum,
             category_id: prodCategoryId ? prodCategoryId : null,
-            barcode: prodBarcode.trim() || null,
+            barcode: finalBarcode,
+            qr_data: finalBarcode,
             bonus_points: parseInt(prodBonusPoints, 10) || 0,
           },
         ])
@@ -188,19 +194,6 @@ export default function InventoryPage() {
         .single();
 
       if (insertErr) throw insertErr;
-
-      if (newProd) {
-        // Use plain SKU for low-density, easy-to-scan QR codes
-        const qrPayload = prodSku.trim();
-
-        // Update product with QR data
-        const { error: updateErr } = await supabase
-          .from("products")
-          .update({ qr_data: qrPayload })
-          .eq("id", newProd.id);
-
-        if (updateErr) throw updateErr;
-      }
 
       // Reset Form & Close
       setProdName("");
