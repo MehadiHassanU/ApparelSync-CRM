@@ -44,8 +44,6 @@ export default function ScannerPOSPage() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [successOrderNum, setSuccessOrderNum] = useState<string | null>(null);
   const [lastOrderTotal, setLastOrderTotal] = useState(0);
-=======
->>>>>>> main
 
   // Autocomplete fetcher inside useEffect to decouple state updates
   React.useEffect(() => {

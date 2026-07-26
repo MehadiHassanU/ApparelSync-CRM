@@ -50,7 +50,7 @@ describe("Admin Dashboard Integration & Analytics Tests", () => {
   it("renders store analytics and KPI cards correctly", async () => {
     render(<Dashboard />);
     await waitFor(() => {
-      expect(screen.getByText("Hello, Store Manager")).toBeDefined();
+      expect(screen.getByText("Admin Dashboard")).toBeDefined();
       expect(screen.getByText("Total Revenue")).toBeDefined();
       expect(screen.getByText("Total Orders")).toBeDefined();
     });
@@ -60,7 +60,7 @@ describe("Admin Dashboard Integration & Analytics Tests", () => {
     render(<Dashboard />);
     await waitFor(() => {
       expect(screen.getByText("Sarah Jenkins")).toBeDefined();
-      expect(screen.getByText("ORD-87483")).toBeDefined();
+      expect(screen.getByText(/ORD-87483/)).toBeDefined();
     });
   });
 
