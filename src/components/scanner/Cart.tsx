@@ -2,6 +2,7 @@
 
 import React from "react";
 import { CartItem } from "@/lib/types";
+import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Plus, Minus, Trash2, ShoppingCart } from "lucide-react";
 
@@ -50,7 +51,7 @@ export default function Cart({ items, onUpdateQuantity, onRemoveItem }: CartProp
                     {product.sku}
                   </span>
                   <span className="text-[10px] text-slate-500 font-semibold">
-                    ${product.price.toFixed(2)} each
+                    {formatCurrency(product.price)} each
                   </span>
                 </div>
               </div>
@@ -83,7 +84,7 @@ export default function Cart({ items, onUpdateQuantity, onRemoveItem }: CartProp
               <div className="flex items-center gap-3.5 shrink-0">
                 <div className="text-right">
                   <div className="font-black text-white text-sm">
-                    ${calculateItemTotal(item).toFixed(2)}
+                    {formatCurrency(calculateItemTotal(item))}
                   </div>
                 </div>
                 <Button
@@ -104,16 +105,16 @@ export default function Cart({ items, onUpdateQuantity, onRemoveItem }: CartProp
       <div className="pt-4 border-t border-[#1d2434] space-y-2">
         <div className="flex justify-between text-xs font-bold text-slate-400">
           <span>Subtotal</span>
-          <span className="text-slate-200">${calculateGrandTotal().toFixed(2)}</span>
+          <span className="text-slate-200">{formatCurrency(calculateGrandTotal())}</span>
         </div>
         <div className="flex justify-between text-xs font-bold text-slate-400 pb-2">
           <span>Tax (0.00%)</span>
-          <span className="text-slate-200">$0.00</span>
+          <span className="text-slate-200">{formatCurrency(0)}</span>
         </div>
         <div className="flex justify-between items-center pt-2.5 border-t border-dashed border-[#1d2434]">
           <span className="text-sm font-black text-white">Grand Total</span>
           <span className="text-lg font-black text-emerald-400">
-            ${calculateGrandTotal().toFixed(2)}
+            {formatCurrency(calculateGrandTotal())}
           </span>
         </div>
       </div>

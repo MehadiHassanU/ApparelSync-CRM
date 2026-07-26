@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Customer, CustomerRow, CustomerOrderHistory } from "@/lib/types";
+import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -460,7 +461,7 @@ export default function CustomersPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="text-3xl font-black text-white tracking-tight">
-              ${stats.totalSpentSum.toFixed(2)}
+              {formatCurrency(stats.totalSpentSum)}
             </div>
             <div className="text-[11px] text-slate-500 font-bold mt-1">Cumulative sales revenue</div>
           </CardContent>
@@ -477,7 +478,7 @@ export default function CustomersPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="text-3xl font-black text-teal-400 tracking-tight">
-              ${stats.avgLtv.toFixed(2)}
+              {formatCurrency(stats.avgLtv)}
             </div>
             <div className="text-[11px] text-slate-500 font-bold mt-1">Average spent per customer</div>
           </CardContent>
@@ -636,7 +637,7 @@ export default function CustomersPage() {
 
                       {/* LTV Total Spent */}
                       <td className="py-4 px-4 text-right font-black text-emerald-400 text-sm">
-                        ${(cust.totalSpent || 0).toFixed(2)}
+                        {formatCurrency(cust.totalSpent || 0)}
                       </td>
 
                       {/* Last Order Date */}
@@ -824,7 +825,7 @@ export default function CustomersPage() {
                     Total Spent (LTV)
                   </span>
                   <span className="text-2xl font-black text-emerald-400 mt-1 block">
-                    ${(viewCustomer.totalSpent || 0).toFixed(2)}
+                    {formatCurrency(viewCustomer.totalSpent || 0)}
                   </span>
                 </div>
               </div>
@@ -913,7 +914,7 @@ export default function CustomersPage() {
                         </div>
 
                         <div className="text-right">
-                          <div className="font-black text-emerald-400 text-sm">${ord.total.toFixed(2)}</div>
+                          <div className="font-black text-emerald-400 text-sm">{formatCurrency(ord.total)}</div>
                         </div>
                       </div>
                     ))}
