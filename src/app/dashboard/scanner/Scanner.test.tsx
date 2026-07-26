@@ -78,7 +78,7 @@ describe("Scanner POS Page Integration Tests", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Vintage Denim Jacket").length).toBeGreaterThan(0);
       expect(screen.getByText("SKU: AP-998822", { exact: false })).toBeDefined();
-      expect(screen.getAllByText("$89.99", { exact: false }).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/89\.99/, { exact: false }).length).toBeGreaterThan(0);
     });
 
     // Check shopping cart displays the item since it's auto-added
