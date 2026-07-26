@@ -1,87 +1,89 @@
 # ApparelSync-CRM — Clothing Retail Shop POS & CRM Suite
 
-ApparelSync-CRM is a modern, high-performance Customer Relationship Management (CRM) and Point of Sale (POS) system built for clothing and retail apparel businesses. Powered by **Next.js 14 (App Router)**, **Tailwind CSS**, and **Supabase (PostgreSQL)**, it streamlines inventory management, live camera QR scanning, customer profiling, lifetime value (LTV) analytics, order management, PDF invoice generation, and a fully customizable Reward Points & VIP Loyalty Program.
+ApparelSync-CRM is a modern, high-performance Customer Relationship Management (CRM) and Point of Sale (POS) system built for clothing and retail apparel businesses. Powered by **Next.js 14 (App Router)**, **Tailwind CSS**, and **Supabase (PostgreSQL)**, it streamlines inventory management, live camera QR scanning, customer profiling, customer loyalty & rewards, PDF invoice generation, lifetime value (LTV) analytics, and POS transactions.
 
 ---
 
 ## 🚀 Tech Stack
 
 - **Frontend Framework:** Next.js 14 (React 18, App Router)
-- **Styling & Aesthetics:** Vanilla CSS & Tailwind CSS (Modern Dark Mode Design System)
+- **Styling & Aesthetics:** Tailwind CSS (Dark Mode Design System)
 - **Backend & Database:** Supabase (PostgreSQL with RLS policies)
-- **UI Component System:** `@base-ui/react` (Shadcn/ui design primitives)
-- **PDF Generation:** `jspdf` (Custom Retail Invoice Engine)
+- **UI Component System:** `@base-ui/react` (Shadcn/ui base-nova design primitives)
 - **QR / Barcode Scanning:** `html5-qrcode` & `qrcode.react`
 - **Charts & Data Visualization:** Recharts
-- **Testing Suite:** Vitest + JSDOM + `@testing-library/react` (31 tests / 9 suites)
+- **Invoice Generation:** `jspdf` & `html2canvas`
+- **Testing Suite:** Vitest + JSDOM + `@testing-library/react`
 
 ---
 
 ## 📊 Feature Implementation Status
 
 ### Scorecard Summary
-- **User Stories Completed:** 9 / 10 ✅
-- **Testing Coverage:** 31 / 31 Unit & Integration Tests Passing (100%) ✅
+- **User Stories Completed:** 8 / 10
+- **User Stories Partially Completed:** 1 / 10
+- **User Stories Not Started:** 1 / 10
 
 ---
 
-### Completed Features & Modules
+### Completed Features ✅
 
-#### 1. Order Management & PDF Invoicing (`/dashboard/orders`) — ✅ **COMPLETED**
-- **Customer Lookup & Auto-Registration**: Select existing customer profiles or type a new name to automatically create a customer profile.
-- **Order Lifecycle**: Full tracking from `processing` to `delivered` and `awaiting`.
-- **Automatic PDF Invoices**: Generates and downloads official retail PDF invoices via `jspdf` featuring item breakdowns, payment modes, and reward points summaries.
-- **Mobile Responsive**: Fully responsive dark mode layout with drawer controls for phones and tablets.
+#### 1. Product Inventory CRUD — ✅ **COMPLETED**
+- Full CRUD operations on the `products` table. Includes search, category filtering, auto-SKU generation, BDT (৳) currency formatting, and low-stock warning badges (stock &le; 5).
+- **Location:** [src/app/dashboard/inventory/page.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/inventory/page.tsx)
 
-#### 2. Customizable Reward Points & VIP Loyalty System (`src/lib/loyalty.ts`) — ✅ **COMPLETED**
-- **Spending-Based Points**: Configurable earning rule (default: 1 Point for every $10 spent).
-- **Point Redemption**: Redeem points for instant dollar discounts during checkout (default: 100 Points = $5.00 discount).
-- **VIP Tiers & Multipliers**: Automatically promotes customers across 🥉 **Bronze** (1.0x), 🥈 **Silver** (1.2x), and 🥇 **Gold** (1.5x) tiers based on points threshold.
-- **Bonus Product Points**: Assign custom bonus points to specific high-margin inventory products.
-- **Store Manager Rules Panel**: Configure custom spend ratios, redemption rates, and VIP tier thresholds in `/dashboard/customers`.
-- **Manual Point Adjustments & Gifts**: Store managers can gift bonus points (e.g. Birthday Gifts, Promos) or adjust balances with audit trail logging in `point_transactions`.
+#### 2. Live Barcode/QR POS Scanner — ✅ **COMPLETED**
+- Responsive web camera QR scanner using low-density plain SKU strings for fast decode on webcams. Supports manual SKU/barcode search, cross-browser Web Audio scan beep, instant cart building, and printable receipts.
+- **Location:** [src/app/dashboard/scanner/page.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/scanner/page.tsx) & [src/components/scanner/ScannerCamera.tsx](file:///n:/app_sync/ApparelSync-CRM/src/components/scanner/ScannerCamera.tsx)
 
-#### 3. Product Inventory Management (`/dashboard/inventory`) — ✅ **COMPLETED**
-- **Full CRUD Operations**: Create, edit, search, and delete products with SKU, category, price, and stock management.
-- **Bonus Reward Points**: Configure bonus reward points per product with `+XX PTS BONUS` badges.
-- **Low-Stock Alerts**: Automated badges for items with stock &le; 5.
-- **Auto SKU & Barcode Generator**: Instant SKU generation and QR payload creation.
+#### 3. Automatic Inventory Stock Deductions — ✅ **COMPLETED**
+- POS checkout automatically runs atomic stock deductions (`stock_quantity = stock_quantity - item.quantity`) in Supabase.
+- **Location:** `handleCheckout` in [scanner/page.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/scanner/page.tsx)
 
-#### 4. Live Barcode/QR POS Scanner (`/dashboard/scanner`) — ✅ **COMPLETED**
-- **Responsive Camera Scanner**: Real-time camera QR decode using `html5-qrcode` with low-density plain SKU payloads.
-- **Cart & POS Checkout**: Instant cart building, item quantity adjustments, customer autocomplete, Web Audio scan beeps, and printable receipts.
+#### 4. Customer Profiles & LTV Intelligence — ✅ **COMPLETED**
+- Dedicated Customer Profiles module at `/dashboard/customers`. Records customer name, phone, email, address, city, and notes. Tracks cumulative Customer Lifetime Value (LTV), order counts, and returning customer ratios. Includes auto customer picker search in POS checkout to prevent duplicate profiles.
+- **Location:** [src/app/dashboard/customers/page.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/customers/page.tsx) & [src/components/customers/CustomerPicker.tsx](file:///n:/app_sync/ApparelSync-CRM/src/components/customers/CustomerPicker.tsx)
 
-#### 5. Customer Profiles & LTV Intelligence (`/dashboard/customers`) — ✅ **COMPLETED**
-- **Customer Directory**: Track Customer Lifetime Value (LTV), total orders, average order values, and returning customer ratios.
-- **Loyalty Badges & Audit Ledger**: Displays VIP Tier badges, current point balances, and transaction history timelines (`EARNED`, `REDEEMED`, `BONUS`).
+#### 5. Customer Purchase History Timeline — ✅ **COMPLETED**
+- Slide-over customer profile drawer rendering full transactional order history linked via `customer_id`. Displays order numbers, dates, payment modes, total spent, and status badges.
+- **Location:** `viewCustomer` drawer in [customers/page.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/customers/page.tsx)
 
-#### 6. Admin Analytics Dashboard (`/dashboard`) — ✅ **COMPLETED**
-- **Real-Time KPIs**: Total Revenue, Total Orders, Net Profit estimations, and sales category donut chart.
-- **Processing Orders Tracker**: Summary table of active processing orders with quick status toggle.
+#### 6. Customer Loyalty & Rewards System — ✅ **COMPLETED**
+- Auto-calculate and earn reward points on purchases, tier assignment (Bronze, Silver, Gold), point redemption on checkout, and bonus points tracking.
+- **Location:** [src/lib/loyalty.ts](file:///n:/app_sync/ApparelSync-CRM/src/lib/loyalty.ts)
+
+#### 7. Orders & PDF Invoice Generation — ✅ **COMPLETED**
+- Dedicated Orders dashboard (`/dashboard/orders`) and PDF invoice generator supporting instant download of transaction invoices.
+- **Location:** [src/app/dashboard/orders/page.tsx](file:///n:/app_sync/ApparelSync-CRM/src/app/dashboard/orders/page.tsx) & [src/lib/invoiceGenerator.ts](file:///n:/app_sync/ApparelSync-CRM/src/lib/invoiceGenerator.ts)
 
 ---
 
-## 👥 Team Branching & Workflow
+## 👥 Team Branching Strategy
 
-- `main`: Production-ready branch containing merged, fully tested code.
-- `safin`: Feature workspace branch for active development and extensions.
+The repository follows a clean team workflow:
+
+- `main`: Primary production-ready branch containing merged and tested code.
 - `Nafis`: Customer Profiles, Purchase History, POS Autocomplete, and schema enhancements.
-- `Uthso`: Assigned feature workspace branch.
+- `Safin`: Orders Dashboard, Loyalty Points System, and Invoice PDF Generation.
+- `Utsho`: Auto customer picker search, BDT currency formatting, and scanner improvements.
 
 ---
 
 ## 🛠️ Developer Setup & Commands
 
 ### Prerequisites
-- Node.js 20+ installed.
+Node.js 20+ installed.
 
 ### Installation
 ```bash
 npm install
 ```
 
-### Database Migration (Supabase SQL Editor)
-Run the SQL script from `supabase/migration.sql` in your **[Supabase SQL Editor](https://supabase.com/dashboard)** to set up tables (`products`, `categories`, `sales`, `sale_items`, `customers`, `point_transactions`) and RLS policies.
+### Database Migrations
+Apply SQL migration scripts in order from `supabase/migrations/`:
+1. `20260705172127_init_schema.sql` (Products, Categories, Sales, Sale Items)
+2. `20260726000000_enhance_customers_schema.sql` (Customer Profiles schema)
+3. `supabase/migration.sql` (Loyalty & Orders schema updates)
 
 ### Running Locally
 ```bash
@@ -93,12 +95,6 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ```bash
 npm test
 ```
-All 31 unit & integration tests across 9 test files will execute via Vitest.
-
-### Type Check
-```bash
-npx tsc --noEmit
-```
 
 ### Production Build
 ```bash
@@ -109,7 +105,7 @@ npm run build
 
 ## 📜 License & Credit Attribution
 
-This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)** - see the [LICENSE](file:///c:/Users/Admin/Desktop/ApparelSync-CRM-main/LICENSE) file for details.
+This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)** - see the [LICENSE](file:///n:/app_sync/ApparelSync-CRM/LICENSE) file for full details.
 
 ### Commercial & Public Use Terms
-ApparelSync-CRM is open-source. Anyone is free to use, modify, and distribute this software under the GNU GPL v3.0 license, provided that **attribution credit is given to the original authors** (ApparelSync CRM Team: **Mehadi Hassan Uthso, Nafis, Safin**).
+ApparelSync-CRM is open-source. Anyone is free to use, modify, and distribute this software for personal or commercial purposes under the GNU GPL v3.0 license, provided that **attribution credit is given to the original authors** (ApparelSync CRM Team: **Mehadi Hassan Uthso, Nafis, Safin**).

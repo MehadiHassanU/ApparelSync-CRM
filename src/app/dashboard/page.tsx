@@ -1,93 +1,73 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { Order, OrderStatus } from "../../lib/mockData";
-import { supabase } from "../../lib/supabaseClient";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/lib/supabaseClient";
+import { formatCurrency } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
+  DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  Tooltip,
+  DollarSign,
+  ShoppingBag,
+  TrendingUp,
+  Clock,
+  CheckCircle,
+  Package,
+  Plus,
+  ArrowRight,
+  Eye,
+  Trash,
+  Loader2,
+  AlertCircle,
+  PieChart as PieChartIcon,
+  Search,
+} from "lucide-react";
+import CustomerPicker from "@/components/customers/CustomerPicker";
+import {
   ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
   PieChart,
   Pie,
   Cell,
-  Sector,
 } from "recharts";
-import {
-  Search,
-  Bell,
-  ShoppingBag,
-  ArrowUpRight,
-  Eye,
-  CheckCircle,
-  PackageCheck,
-  Clock,
-  Truck,
-  Sparkles,
-  TrendingUp,
-  Loader2,
-  RefreshCw,
-  ArrowRight,
-} from "lucide-react";
 
-// Category sales donut chart data
-const categorySalesData = [
-  { name: "Apparel & Suits", value: 35, color: "#10b981" },
-  { name: "Laptops & Tech", value: 25, color: "#6366f1" },
-  { name: "Footwear & Shoes", value: 20, color: "#f59e0b" },
-  { name: "Accessories", value: 12, color: "#ec4899" },
-  { name: "Electronics", value: 8, color: "#06b6d4" },
+// ─── Order Data Interface ───────────────────────────────────────────────────
+export type OrderStatus = "delivered" | "on way" | "awaiting" | "processing";
+
+export interface Order {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerId?: string | null;
+  category: string;
+  price: number;
+  formattedPrice: string;
+  date: string;
+  paymentMethod: string;
+  status: OrderStatus;
+}
+
+// Fixed Category Donut Data
+const categoryDistribution = [
+  { name: "Shirts & Polos", value: 45, color: "#10b981" },
+  { name: "Denim & Pants", value: 25, color: "#6366f1" },
+  { name: "Outerwear & Jackets", value: 18, color: "#f59e0b" },
+  { name: "Activewear", value: 12, color: "#06b6d4" },
 ];
-
-// Custom Active Shape for Interactive Donut Chart Hover
-const renderActiveShape = (props: any) => {
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value } = props;
-  return (
-    <g>
-      <text x={cx} y={cy} dy={-4} textAnchor="middle" fill="#ffffff" className="font-extrabold text-xs">
-        {payload.name.split(" ")[0]}
-      </text>
-      <text x={cx} y={cy} dy={14} textAnchor="middle" fill="#10b981" className="font-black text-sm">
-        {value}%
-      </text>
-      <Sector
-        cx={cx}
-        cy={cy}
-        innerRadius={innerRadius}
-        outerRadius={outerRadius + 6}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        fill={fill}
-      />
-    </g>
-  );
-};
 
 export default function Dashboard() {
   // ─── Live Supabase State ─────────────────────────────────────────────────────
@@ -100,6 +80,16 @@ export default function Dashboard() {
   const [isViewChartOpen, setIsViewChartOpen] = useState(false);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
   const [activePieIndex, setActivePieIndex] = useState(0);
+
+  // Form states for adding new order
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newCustomer, setNewCustomer] = useState("");
+  const [newCustomerId, setNewCustomerId] = useState<string | null>(null);
+  const [newCategory, setNewCategory] = useState("Apparel");
+  const [newPrice, setNewPrice] = useState("");
+  const [newPayment, setNewPayment] = useState("PayPal");
+  const [newStatus, setNewStatus] = useState<OrderStatus>("on way");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ─── Fetch Sales Data from Supabase ─────────────────────────────────────────
   const fetchSalesFromSupabase = useCallback(async () => {
@@ -120,9 +110,7 @@ export default function Dashboard() {
         `)
         .order("sale_date", { ascending: false });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (data) {
         const mappedOrders: Order[] = data.map((item: any) => {
@@ -140,7 +128,7 @@ export default function Dashboard() {
             customerId: item.customer_id,
             category: "Apparel",
             price: Number(item.total),
-            formattedPrice: `$${Number(item.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+            formattedPrice: formatCurrency(Number(item.total)),
             date: item.sale_date ? new Date(item.sale_date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
             paymentMethod: item.payment_method || "Cash",
             status: statusStr,
@@ -164,11 +152,11 @@ export default function Dashboard() {
   const dynamicKPIs = useMemo(() => {
     const totalRev = orders.reduce((sum, o) => sum + o.price, 0);
     const totalOrd = orders.length;
-    const netProf = totalRev * 0.6; // Estimated net margin
+    const netProf = totalRev * 0.6;
 
     return {
       totalRevenue: {
-        formattedValue: `$${totalRev.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        formattedValue: formatCurrency(totalRev),
         value: totalRev,
       },
       totalOrders: {
@@ -176,13 +164,13 @@ export default function Dashboard() {
         value: totalOrd,
       },
       netProfit: {
-        formattedValue: `$${netProf.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        formattedValue: formatCurrency(netProf),
         value: netProf,
       },
     };
   }, [orders]);
 
-  // Dynamic Revenue Chart Data derived from sales dates
+  // Dynamic Revenue Chart Data
   const revenueChartData = useMemo(() => {
     if (orders.length === 0) {
       return [
@@ -195,7 +183,7 @@ export default function Dashboard() {
     }
     const map: Record<string, number> = {};
     orders.forEach((o) => {
-      const d = o.date.slice(5); // MM-DD
+      const d = o.date.slice(5);
       map[d] = (map[d] || 0) + o.price;
     });
     return Object.entries(map)
@@ -204,259 +192,266 @@ export default function Dashboard() {
       .reverse();
   }, [orders]);
 
-  // Processing orders list (only orders with status === "processing")
+  // Processing orders list
   const processingOrders = useMemo(() => {
     return orders
-      .filter((o) => o.status === "processing")
+      .filter((o) => o.status === "processing" || o.status === "on way" || o.status === "awaiting")
       .filter((o) =>
         o.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         o.orderNumber.toLowerCase().includes(searchQuery.toLowerCase())
       );
   }, [orders, searchQuery]);
 
-  // ─── Mark Order Delivered in Supabase ───────────────────────────────────────
-  const handleMarkDelivered = async (id: string) => {
+  // ─── CRUD: Add New Order Payload to Supabase ──────────────────────────────
+  const handleAddOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustomer || !newPrice) return;
+
+    setIsSubmitting(true);
+    try {
+      let customerId = newCustomerId;
+
+      if (!customerId) {
+        const { data: existingCust } = await supabase
+          .from("customers")
+          .select("id")
+          .eq("full_name", newCustomer.trim())
+          .maybeSingle();
+
+        if (existingCust) {
+          customerId = existingCust.id;
+        } else {
+          const { data: newCust, error: custErr } = await supabase
+            .from("customers")
+            .insert([{ full_name: newCustomer.trim() }])
+            .select("id")
+            .single();
+
+          if (custErr) throw custErr;
+          if (newCust) customerId = newCust.id;
+        }
+      }
+
+      const priceNum = parseFloat(newPrice);
+      const generatedOrderNum = `NA${Math.floor(100000 + Math.random() * 900000)}`;
+
+      const { error: saleErr } = await supabase.from("sales").insert([
+        {
+          order_number: generatedOrderNum,
+          customer_id: customerId,
+          subtotal: priceNum,
+          total: priceNum,
+          payment_method: newPayment,
+          status: newStatus,
+        },
+      ]);
+
+      if (saleErr) throw saleErr;
+
+      setIsAddDialogOpen(false);
+      setNewCustomer("");
+      setNewCustomerId(null);
+      setNewPrice("");
+      await fetchSalesFromSupabase();
+    } catch (err: any) {
+      console.error("Add Order Error:", err);
+      alert(`Error adding order: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ─── CRUD: Mark Delivered ──────────────────────────────────────────────────
+  const handleMarkDelivered = async (orderId: string) => {
     try {
       const { error } = await supabase
         .from("sales")
         .update({ status: "delivered" })
-        .eq("id", id);
+        .eq("id", orderId);
+
       if (error) throw error;
-      setOrders(
-        orders.map((o) => (o.id === id ? { ...o, status: "delivered" as OrderStatus } : o))
-      );
+      await fetchSalesFromSupabase();
     } catch (err: any) {
       console.error("Update Status Error:", err);
-      alert(`Could not update order status: ${err.message}`);
+      alert(`Failed to update status: ${err.message}`);
     }
   };
 
-  const getStatusBadgeClass = (status: OrderStatus) => {
-    switch (status) {
-      case "delivered":
-        return "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30";
-      case "awaiting":
-        return "bg-slate-500/20 text-slate-400 border-slate-500/40 hover:bg-slate-500/30";
-      case "processing":
-        return "bg-amber-500/20 text-amber-400 border-amber-500/40 hover:bg-amber-500/30";
-      default:
-        return "bg-slate-800 text-slate-300 border-slate-700";
+  // ─── CRUD: Delete Order ────────────────────────────────────────────────────
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!confirm("Are you sure you want to delete this order?")) return;
+    try {
+      const { error } = await supabase.from("sales").delete().eq("id", orderId);
+      if (error) throw error;
+      await fetchSalesFromSupabase();
+    } catch (err: any) {
+      console.error("Delete Order Error:", err);
+      alert(`Failed to delete order: ${err.message}`);
     }
   };
 
   return (
     <>
-
-          {/* Header Bar */}
-          <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-[#1d2434] pb-6">
-            <div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white">Hello, Store Manager</h1>
-                <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Store Active
-                </span>
-              </div>
-              <p className="text-slate-400 text-sm mt-1.5 font-medium">Real-time store operations, sales, and analytics.</p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-4">
-              <button
-                onClick={() => fetchSalesFromSupabase()}
-                disabled={loading}
-                className="p-2.5 rounded-full bg-[#111520] border border-[#1d2434] text-slate-400 hover:text-white transition-all relative cursor-pointer"
-                title="Refresh Live Data"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-emerald-400" : ""}`} />
-              </button>
-
-              <div className="relative flex-1 sm:flex-initial">
-                <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3" />
-                <Input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search store..."
-                  className="bg-[#111520] border-[#1d2434] rounded-full py-2.5 pl-11 pr-5 text-xs text-slate-200 placeholder-slate-500 w-full sm:w-64 focus:border-emerald-500"
-                />
-              </div>
-
-              <button className="p-2.5 rounded-full bg-[#111520] border border-[#1d2434] text-slate-400 hover:text-white transition-all relative">
-                <Bell className="w-4 h-4" />
-                <span className="w-2 h-2 rounded-full bg-emerald-500 absolute top-2 right-2 ring-2 ring-[#0a0d14]" />
-              </button>
-
-              <div className="flex items-center gap-3.5 pl-3 border-l border-[#1d2434]">
-                <div className="w-10 h-10 rounded-full bg-emerald-600/25 border border-emerald-500/40 flex items-center justify-center font-extrabold text-sm text-emerald-400 shadow-sm">
-                  CRM
-                </div>
-                <div className="hidden sm:block">
-                  <div className="text-sm font-bold text-white">Admin User</div>
-                  <div className="text-xs text-slate-400 font-semibold">Store Manager</div>
-                </div>
-              </div>
-            </div>
-          </header>
-
-      {/* Error Banner */}
-      {errorMsg && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold flex items-center justify-between">
-          <span>Error loading store data: {errorMsg}</span>
-          <Button onClick={() => fetchSalesFromSupabase()} size="sm" variant="outline" className="text-xs h-8 border-rose-500/40 text-rose-300">
-            Retry Connection
-          </Button>
+      {/* Top Header */}
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#1d2434] pb-6">
+        <div>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white flex items-center gap-3">
+            Admin Dashboard
+          </h1>
+          <p className="text-slate-400 text-sm sm:text-base mt-2 font-medium">
+            Welcome back! Real-time telemetry, live POS orders, and inventory overview.
+          </p>
         </div>
-      )}
 
-      {/* ─── Top KPI Cards Grid ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Card 1: Total Revenue */}
-        <Card className="bg-gradient-to-br from-indigo-600 via-indigo-600 to-emerald-600 text-white border-none shadow-2xl shadow-indigo-600/20 p-6 rounded-3xl">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-0">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-indigo-100">Total Revenue</CardTitle>
-            <div className="p-2 bg-white/15 rounded-full backdrop-blur-md">
-              <ArrowUpRight className="w-5 h-5 text-white" />
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard/orders">
+            <Button className="bg-[#111520] hover:bg-[#1c2335] text-slate-200 border border-slate-700/60 font-bold text-xs rounded-2xl h-11 px-5 flex items-center gap-2">
+              <Package className="w-4 h-4 text-emerald-400" /> Orders Center
+            </Button>
+          </Link>
+          <Link href="/dashboard/scanner">
+            <Button className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-2xl h-11 px-5 flex items-center gap-2 shadow-lg shadow-emerald-500/25">
+              <Plus className="w-4 h-4 stroke-[3]" /> Launch POS Scanner
+            </Button>
+          </Link>
+        </div>
+      </header>
+
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+        <Card className="bg-[#111520] border-[#1d2434] shadow-xl rounded-3xl p-6 relative overflow-hidden">
+          <CardHeader className="p-0 pb-4 flex flex-row items-center justify-between">
+            <CardTitle className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+              Total Revenue
+            </CardTitle>
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <DollarSign className="w-5 h-5 stroke-[2.5]" />
             </div>
           </CardHeader>
-          <CardContent className="p-0 pt-4">
-            <div className="text-4xl sm:text-5xl font-black tracking-tight">
-              {loading ? <Loader2 className="w-8 h-8 animate-spin" /> : dynamicKPIs.totalRevenue.formattedValue}
+          <CardContent className="p-0">
+            <div className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+              {dynamicKPIs.totalRevenue.formattedValue}
             </div>
-            <div className="flex items-center gap-2.5 mt-5 text-xs font-bold">
-              <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-400/30 text-emerald-100 text-xs font-black">
-                Active Store
-              </span>
-              <span className="text-indigo-100/90 font-semibold">calculated dynamically</span>
+            <div className="flex items-center gap-2 mt-2">
+              <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5">
+                +14.2% month
+              </Badge>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 2: Total Orders */}
-        <Card className="bg-[#111520] border-[#1d2434] text-white shadow-xl hover:border-emerald-500/40 transition-all p-6 rounded-3xl">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-0">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Orders</CardTitle>
-            <div className="p-2 bg-[#171d2b] rounded-full border border-slate-700/50">
-              <ShoppingBag className="w-5 h-5 text-emerald-400" />
+        <Card className="bg-[#111520] border-[#1d2434] shadow-xl rounded-3xl p-6 relative overflow-hidden">
+          <CardHeader className="p-0 pb-4 flex flex-row items-center justify-between">
+            <CardTitle className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+              Total Orders
+            </CardTitle>
+            <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <ShoppingBag className="w-5 h-5 stroke-[2.5]" />
             </div>
           </CardHeader>
-          <CardContent className="p-0 pt-4">
-            <div className="text-4xl sm:text-5xl font-black tracking-tight text-white">
-              {loading ? <Loader2 className="w-8 h-8 animate-spin" /> : dynamicKPIs.totalOrders.formattedValue}
+          <CardContent className="p-0">
+            <div className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+              {dynamicKPIs.totalOrders.formattedValue}
             </div>
-            <div className="flex items-center gap-2.5 mt-5 text-xs font-bold">
-              <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-black">
-                Active
-              </span>
-              <span className="text-slate-400 font-semibold">recorded in sales table</span>
+            <div className="flex items-center gap-2 mt-2">
+              <Badge className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 text-[10px] font-bold px-2 py-0.5">
+                Live Sales
+              </Badge>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 3: Net Profit */}
-        <Card className="bg-[#111520] border-[#1d2434] text-white shadow-xl hover:border-emerald-500/40 transition-all p-6 rounded-3xl">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-0">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-400">Net Profit (Est.)</CardTitle>
-            <div className="p-2 bg-[#171d2b] rounded-full border border-slate-700/50">
-              <TrendingUp className="w-5 h-5 text-teal-400" />
+        <Card className="bg-[#111520] border-[#1d2434] shadow-xl rounded-3xl p-6 relative overflow-hidden">
+          <CardHeader className="p-0 pb-4 flex flex-row items-center justify-between">
+            <CardTitle className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+              Estimated Net Profit
+            </CardTitle>
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+              <TrendingUp className="w-5 h-5 stroke-[2.5]" />
             </div>
           </CardHeader>
-          <CardContent className="p-0 pt-4">
-            <div className="text-4xl sm:text-5xl font-black tracking-tight text-white">
-              {loading ? <Loader2 className="w-8 h-8 animate-spin" /> : dynamicKPIs.netProfit.formattedValue}
+          <CardContent className="p-0">
+            <div className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+              {dynamicKPIs.netProfit.formattedValue}
             </div>
-            <div className="flex items-center gap-2.5 mt-5 text-xs font-bold">
-              <span className="inline-flex items-center px-3 py-1 rounded-full bg-teal-500/20 text-teal-400 text-xs font-black">
-                +60% Margin
-              </span>
-              <span className="text-slate-400 font-semibold">estimated net profit</span>
+            <div className="flex items-center gap-2 mt-2">
+              <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5">
+                60% Margin
+              </Badge>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* ─── Middle Section: Revenue Bar Chart & Interactive Donut Chart ────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Revenue Bar Chart (2 cols) */}
-        <Card className="lg:col-span-2 bg-[#111520] border-[#1d2434] text-white shadow-xl hover:border-emerald-500/40 transition-all rounded-3xl p-6">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-0">
+      {/* Analytics Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <Card className="lg:col-span-2 bg-[#111520] border-[#1d2434] shadow-2xl rounded-3xl p-6 sm:p-8">
+          <CardHeader className="p-0 pb-6 flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-base font-extrabold text-white">Monthly Revenue Flow</CardTitle>
-              <p className="text-xs text-slate-400 mt-1 font-medium">Apparel store revenue trends</p>
+              <CardTitle className="text-lg font-black text-white">Revenue Telemetry</CardTitle>
+              <p className="text-xs text-slate-400 mt-1 font-medium">Daily transaction volume trends</p>
             </div>
-            <Button
-              onClick={() => setIsViewChartOpen(true)}
-              variant="outline"
-              size="sm"
-              className="bg-[#171d2b] border-slate-700/60 text-slate-200 hover:bg-[#202839] text-xs font-bold gap-2 rounded-xl h-9 px-4"
-            >
-              Expand Chart <ArrowUpRight className="w-4 h-4 text-emerald-400" />
-            </Button>
           </CardHeader>
-          <CardContent className="p-0 pt-6">
-            <div className="h-60 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <XAxis dataKey="date" tick={{ fill: "#94a3b8", fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#171d2b", borderColor: "#2d374d", borderRadius: "12px", fontSize: "13px", fontWeight: "bold" }}
-                    itemStyle={{ color: "#10b981" }}
-                  />
-                  <Bar dataKey="revenue" fill="#6366f1" radius={[8, 8, 0, 0]}>
-                    {revenueChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === revenueChartData.length - 1 ? "#10b981" : "#6366f1"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          <CardContent className="p-0 h-[280px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={revenueChartData}>
+                <defs>
+                  <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "#0a0d14", borderColor: "#1d2434", borderRadius: "12px", color: "#fff", fontSize: "12px" }}
+                />
+                <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
+              </AreaChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Sales by Category Donut Chart */}
-        <Card className="bg-[#111520] border-[#1d2434] text-white shadow-xl hover:border-emerald-500/40 transition-all rounded-3xl p-6 flex flex-col justify-between">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-0">
-            <div>
-              <CardTitle className="text-base font-extrabold text-white">Sales by Category</CardTitle>
-              <p className="text-xs text-slate-400 mt-1 font-medium">Hover slices for insights</p>
-            </div>
-            <Sparkles className="w-5 h-5 text-emerald-400" />
+        {/* Category Share Donut */}
+        <Card className="bg-[#111520] border-[#1d2434] shadow-2xl rounded-3xl p-6 sm:p-8 flex flex-col justify-between">
+          <CardHeader className="p-0 pb-4">
+            <CardTitle className="text-lg font-black text-white flex items-center justify-between">
+              <span>Category Distribution</span>
+              <PieChartIcon className="w-5 h-5 text-slate-400" />
+            </CardTitle>
           </CardHeader>
-          <CardContent className="p-0 pt-4 flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div className="h-44 w-44 shrink-0">
+          <CardContent className="p-0 flex flex-col items-center">
+            <div className="w-full h-[180px] relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    {...({
-                      activeIndex: activePieIndex,
-                      activeShape: renderActiveShape,
-                      data: categorySalesData,
-                      innerRadius: 44,
-                      outerRadius: 66,
-                      paddingAngle: 4,
-                      dataKey: "value",
-                      onMouseEnter: (_: any, index: number) => setActivePieIndex(index),
-                    } as any)}
+                    data={categoryDistribution}
+                    innerRadius={55}
+                    outerRadius={75}
+                    paddingAngle={5}
+                    dataKey="value"
+                    onMouseEnter={(_, index) => setActivePieIndex(index)}
                   >
-                    {categorySalesData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} className="cursor-pointer transition-all" />
+                    {categoryDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} stroke="#111520" strokeWidth={2} />
                     ))}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                  {categoryDistribution[activePieIndex].name}
+                </span>
+                <span className="text-2xl font-black text-white">
+                  {categoryDistribution[activePieIndex].value}%
+                </span>
+              </div>
             </div>
-            <div className="space-y-2.5 w-full text-xs">
-              {categorySalesData.map((item, idx) => (
-                <div
-                  key={item.name}
-                  onClick={() => setActivePieIndex(idx)}
-                  className={`flex items-center justify-between p-1.5 rounded-xl cursor-pointer transition-all ${
-                    activePieIndex === idx ? "bg-slate-800/80 font-bold" : "hover:bg-slate-800/40"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 overflow-hidden">
-                    <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: item.color }} />
-                    <span className="text-slate-300 font-semibold truncate">{item.name}</span>
-                  </div>
-                  <span className="font-extrabold text-white ml-2">{item.value}%</span>
+            <div className="w-full grid grid-cols-2 gap-2 mt-4">
+              {categoryDistribution.map((cat, i) => (
+                <div key={cat.name} className="flex items-center gap-2 text-xs">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                  <span className="text-slate-300 font-semibold truncate">{cat.name}</span>
                 </div>
               ))}
             </div>
@@ -464,209 +459,190 @@ export default function Dashboard() {
         </Card>
       </div>
 
-          {/* ─── Status Summary Row ───────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            <div className="bg-gradient-to-br from-indigo-900/35 to-indigo-950/60 border border-indigo-500/30 rounded-3xl p-6 backdrop-blur-md shadow-lg hover:border-indigo-500/50 transition-all">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-300">Total orders</span>
-                <PackageCheck className="w-5 h-5 text-indigo-400" />
-              </div>
-              <div className="flex items-baseline gap-3 mt-4">
-                <span className="text-4xl font-black text-white">{orders.length}</span>
-              </div>
-              <span className="text-xs text-slate-400 font-medium block mt-1.5">Live database count</span>
+      {/* Orders Management Table Workspace */}
+      <Card className="bg-[#111520] border-[#1d2434] shadow-2xl rounded-3xl p-6 sm:p-8">
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                <Clock className="w-6 h-6 text-amber-400" />
+                Active / Processing Orders
+              </h2>
+              <p className="text-xs text-slate-400 mt-1 font-medium">
+                Active orders currently being fulfilled ({processingOrders.length} active)
+              </p>
             </div>
 
-            <div className="bg-gradient-to-br from-amber-900/30 to-amber-950/55 border border-amber-500/30 rounded-3xl p-6 backdrop-blur-md shadow-lg hover:border-amber-500/50 transition-all">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-amber-300">Processing</span>
-                <Clock className="w-5 h-5 text-amber-400" />
-              </div>
-              <div className="flex items-baseline gap-3 mt-4">
-                <span className="text-4xl font-black text-amber-400">
-                  {orders.filter((o) => o.status === "processing").length}
-                </span>
-              </div>
-              <span className="text-xs text-slate-400 font-medium block mt-1.5">Active orders in pipeline</span>
-            </div>
+            <div className="flex items-center gap-3">
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger render={
+                  <Button className="bg-[#1c2335] hover:bg-[#252f47] text-white border border-[#2a3652] font-black text-xs rounded-2xl px-4 py-2.5 flex items-center gap-2 transition-all cursor-pointer" />
+                }>
+                  <Plus className="w-4 h-4 stroke-[3] text-emerald-400" /> Add Order
+                </DialogTrigger>
+                <DialogContent className="bg-[#111520] border-[#1d2434] text-white rounded-3xl p-6">
+                  <DialogHeader>
+                    <DialogTitle className="text-xl font-extrabold text-white">Create Apparel Order</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleAddOrder} className="space-y-4 mt-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-300 block mb-1">Customer Profile Name</label>
+                      <CustomerPicker
+                        value={newCustomer}
+                        onChange={(name) => {
+                          setNewCustomer(name);
+                          setNewCustomerId(null);
+                        }}
+                        onSelect={(id, name) => {
+                          setNewCustomerId(id);
+                          setNewCustomer(name);
+                        }}
+                        onClear={() => setNewCustomerId(null)}
+                        placeholder="e.g. Walk-in Customer"
+                        inputClassName="bg-[#0a0d14] border-[#1d2434] text-xs text-white h-10 rounded-xl"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-300 block mb-1">Total Amount (BDT)</label>
+                      <Input
+                        required
+                        type="number"
+                        step="0.01"
+                        placeholder="e.g. 1500"
+                        value={newPrice}
+                        onChange={(e) => setNewPrice(e.target.value)}
+                        className="bg-[#0a0d14] border-[#1d2434] text-xs text-white h-10 rounded-xl"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-slate-300 block mb-1">Payment Method</label>
+                        <select
+                          value={newPayment}
+                          onChange={(e) => setNewPayment(e.target.value)}
+                          className="w-full bg-[#0a0d14] border border-[#1d2434] text-xs text-white h-10 rounded-xl px-3 outline-none focus:border-emerald-500"
+                        >
+                          <option value="Cash">Cash</option>
+                          <option value="PayPal">PayPal</option>
+                          <option value="Credit Card">Credit Card</option>
+                          <option value="bKash">bKash</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-300 block mb-1">Initial Status</label>
+                        <select
+                          value={newStatus}
+                          onChange={(e) => setNewStatus(e.target.value as OrderStatus)}
+                          className="w-full bg-[#0a0d14] border border-[#1d2434] text-xs text-white h-10 rounded-xl px-3 outline-none focus:border-emerald-500"
+                        >
+                          <option value="on way">On Way</option>
+                          <option value="awaiting">Awaiting</option>
+                          <option value="delivered">Delivered</option>
+                        </select>
+                      </div>
+                    </div>
 
-            <div className="bg-gradient-to-br from-emerald-900/30 to-emerald-950/55 border border-emerald-500/30 rounded-3xl p-6 backdrop-blur-md shadow-lg hover:border-emerald-500/50 transition-all">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-300">Delivered</span>
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div className="flex items-baseline gap-3 mt-4">
-                <span className="text-4xl font-black text-emerald-400">
-                  {orders.filter((o) => o.status === "delivered").length}
-                </span>
-              </div>
-              <span className="text-xs text-slate-400 font-medium block mt-1.5">Completed orders</span>
-            </div>
-
-            <div className="bg-gradient-to-br from-slate-900/40 to-slate-950/60 border border-slate-500/20 rounded-3xl p-6 backdrop-blur-md shadow-lg hover:border-slate-500/40 transition-all">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-300">Awaiting</span>
-                <Truck className="w-5 h-5 text-slate-400" />
-              </div>
-              <div className="flex items-baseline gap-3 mt-4">
-                <span className="text-4xl font-black text-white">
-                  {orders.filter((o) => o.status === "awaiting").length}
-                </span>
-              </div>
-              <span className="text-xs text-slate-400 font-medium block mt-1.5">Awaiting processing</span>
-            </div>
-          </div>
-
-          {/* ─── Processing Orders Section ─────────────────────────────────────── */}
-          <div className="space-y-6 pt-6 border-t border-[#1d2434]">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div>
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-                  <Clock className="w-6 h-6 text-amber-400" />
-                  Processing Orders
-                </h2>
-                <p className="text-xs text-slate-400 mt-1 font-medium">
-                  Active orders currently being fulfilled ({processingOrders.length} active)
-                </p>
-              </div>
+                    <div className="pt-4 flex justify-end gap-3">
+                      <DialogClose render={
+                        <Button type="button" variant="ghost" className="text-slate-400 text-xs font-bold" />
+                      }>
+                        Cancel
+                      </DialogClose>
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl px-5 h-10"
+                      >
+                        {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Order"}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
 
               <Link href="/dashboard/orders">
-                <Button
-                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-2xl px-5 py-3 flex items-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
-                >
+                <Button className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-2xl px-5 py-3 flex items-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer">
                   See All Orders
                   <ArrowRight className="w-4 h-4 stroke-[3]" />
                 </Button>
               </Link>
             </div>
-
-            {/* Processing Orders Table */}
-            <Card className="bg-[#111520] border-[#1d2434] shadow-xl p-4 sm:p-6 rounded-3xl">
-              <div className="overflow-x-auto rounded-2xl border border-[#1d2434]">
-                <Table>
-                  <TableHeader className="bg-[#0d1017] border-b border-[#1d2434]">
-                    <TableRow className="hover:bg-transparent border-[#1d2434]">
-                      <TableHead className="px-4 sm:px-5 py-4 text-xs uppercase tracking-wider text-slate-400 font-bold">ORDER NUMBER</TableHead>
-                      <TableHead className="px-4 sm:px-5 py-4 text-xs uppercase tracking-wider text-slate-400 font-bold">CUSTOMER</TableHead>
-                      <TableHead className="px-4 sm:px-5 py-4 text-xs uppercase tracking-wider text-slate-400 font-bold">PRICE</TableHead>
-                      <TableHead className="hidden sm:table-cell px-4 sm:px-5 py-4 text-xs uppercase tracking-wider text-slate-400 font-bold">DATE</TableHead>
-                      <TableHead className="hidden md:table-cell px-4 sm:px-5 py-4 text-xs uppercase tracking-wider text-slate-400 font-bold">PAYMENT</TableHead>
-                      <TableHead className="px-4 sm:px-5 py-4 text-xs uppercase tracking-wider text-slate-400 font-bold">STATUS</TableHead>
-                      <TableHead className="px-4 sm:px-5 py-4 text-right text-xs uppercase tracking-wider text-slate-400 font-bold">ACTION</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody data-testid="order-table-body" className="divide-y divide-[#171d2b]">
-                    {loading ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-12 text-slate-400 text-xs font-bold">
-                          <div className="flex items-center justify-center gap-2">
-                            <Loader2 className="w-5 h-5 animate-spin text-emerald-400" /> Loading processing orders...
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : processingOrders.length > 0 ? (
-                      processingOrders.map((order) => (
-                        <TableRow key={order.id} className="hover:bg-[#171d2b] border-[#171d2b] transition-colors">
-                          <TableCell className="px-4 sm:px-5 py-4 font-mono text-xs font-extrabold text-emerald-400">{order.orderNumber}</TableCell>
-                          <TableCell className="px-4 sm:px-5 py-4">
-                            <div className="font-bold text-white text-sm">{order.customerName}</div>
-                          </TableCell>
-                          <TableCell className="px-4 sm:px-5 py-4 font-black text-white text-sm">{order.formattedPrice}</TableCell>
-                          <TableCell className="hidden sm:table-cell px-4 sm:px-5 py-4 text-slate-400 text-xs font-semibold">{order.date}</TableCell>
-                          <TableCell className="hidden md:table-cell px-4 sm:px-5 py-4 text-slate-300 text-xs font-bold">{order.paymentMethod}</TableCell>
-                          <TableCell className="px-4 sm:px-5 py-4">
-                            <Badge variant="outline" className={`capitalize font-extrabold border text-xs px-3 py-1 rounded-full ${getStatusBadgeClass(order.status)}`}>
-                              {order.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="px-4 sm:px-5 py-4 text-right">
-                            <Button
-                              size="sm"
-                              onClick={() => handleMarkDelivered(order.id)}
-                              className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30 text-xs font-bold h-8 px-3"
-                            >
-                              Mark Delivered
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-10 text-slate-400 text-xs font-bold">
-                          No active processing orders found.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </Card>
           </div>
 
-      {/* ─── Order Details Modal ─────────────────────────────────────────────── */}
-      {selectedOrderDetails && (
-        <Dialog open={!!selectedOrderDetails} onOpenChange={() => setSelectedOrderDetails(null)}>
-          <DialogContent className="bg-[#111520] border-[#1d2434] text-white rounded-3xl p-6">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-extrabold text-white flex items-center gap-3">
-                Order Details <span className="font-mono text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md">{selectedOrderDetails.orderNumber}</span>
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3.5 py-3 text-xs">
-              <div className="flex justify-between py-1.5 border-b border-slate-800">
-                <span className="text-slate-400 font-medium">Customer Name:</span>
-                <span className="font-bold text-white text-sm">{selectedOrderDetails.customerName}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-800">
-                <span className="text-slate-400 font-medium">Price:</span>
-                <span className="font-black text-emerald-400 text-sm">{selectedOrderDetails.formattedPrice}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-800">
-                <span className="text-slate-400 font-medium">Date:</span>
-                <span className="text-slate-300 font-semibold">{selectedOrderDetails.date}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-800">
-                <span className="text-slate-400 font-medium">Payment Method:</span>
-                <span className="text-slate-300 font-semibold">{selectedOrderDetails.paymentMethod}</span>
-              </div>
-              <div className="flex justify-between py-1.5">
-                <span className="text-slate-400 font-medium">Current Status:</span>
-                <Badge variant="outline" className={`capitalize font-bold ${getStatusBadgeClass(selectedOrderDetails.status)}`}>
-                  {selectedOrderDetails.status}
-                </Badge>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={() => setSelectedOrderDetails(null)} className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold w-full h-10 rounded-xl">
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* ─── Revenue Chart Detailed Modal ────────────────────────────────────── */}
-      <Dialog open={isViewChartOpen} onOpenChange={setIsViewChartOpen}>
-        <DialogContent className="bg-[#111520] border-[#1d2434] text-white rounded-3xl max-w-2xl p-6">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-extrabold text-white">Apparel Revenue Analytics</DialogTitle>
-          </DialogHeader>
-          <div className="h-64 w-full pt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={revenueChartData}>
-                <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} fontWeight={600} />
-                <Tooltip contentStyle={{ backgroundColor: "#171d2b", borderColor: "#2d374d", borderRadius: "10px", fontWeight: "bold" }} />
-                <Bar dataKey="revenue" fill="#10b981" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          {/* Table Search & Filter Bar */}
+          <div className="relative w-full max-w-sm">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+            <Input
+              placeholder="Search active orders..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-[#0a0d14] border-[#1d2434] rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-200 placeholder-slate-500 w-full focus:border-emerald-500"
+            />
           </div>
-          <DialogFooter>
-            <Button onClick={() => setIsViewChartOpen(false)} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl h-10 px-6">
-              Done
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+          {/* Processing Orders Table */}
+          <div className="overflow-x-auto">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+                <Loader2 className="w-8 h-8 animate-spin mb-3 text-emerald-400" />
+                <span className="text-xs font-bold uppercase tracking-wider">Loading orders database...</span>
+              </div>
+            ) : processingOrders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+                <CheckCircle className="w-12 h-12 mb-3 text-emerald-400/50 stroke-[1.5]" />
+                <span className="text-sm font-bold text-slate-300">All orders fulfilled!</span>
+                <span className="text-xs text-slate-500 mt-1">No active processing orders matching search.</span>
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-[#1d2434] text-[11px] font-black uppercase text-slate-400 tracking-wider">
+                    <th className="py-3.5 px-4">Order ID</th>
+                    <th className="py-3.5 px-4">Customer</th>
+                    <th className="py-3.5 px-4">Total</th>
+                    <th className="py-3.5 px-4">Status</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1d2434] text-xs font-medium text-slate-300">
+                  {processingOrders.map((ord) => (
+                    <tr key={ord.id} className="hover:bg-[#151b2a] transition-colors">
+                      <td className="py-4 px-4 font-mono font-bold text-white">#{ord.orderNumber}</td>
+                      <td className="py-4 px-4 font-bold text-slate-200">{ord.customerName}</td>
+                      <td className="py-4 px-4 font-black text-emerald-400">{ord.formattedPrice}</td>
+                      <td className="py-4 px-4">
+                        <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-bold uppercase px-2 py-0.5">
+                          {ord.status}
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleMarkDelivered(ord.id)}
+                            className="h-8 px-3 text-xs font-bold text-emerald-400 hover:bg-emerald-500/10 rounded-xl"
+                          >
+                            Mark Delivered
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteOrder(ord.id)}
+                            className="h-8 w-8 p-0 text-rose-400 hover:bg-rose-500/10 rounded-xl"
+                          >
+                            <Trash className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </Card>
     </>
   );
 }

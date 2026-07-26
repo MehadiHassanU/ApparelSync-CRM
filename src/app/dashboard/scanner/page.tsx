@@ -3,10 +3,12 @@
 import React, { useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Product, CartItem } from "@/lib/types";
+import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import CustomerPicker from "@/components/customers/CustomerPicker";
 import {
   Loader2,
   ScanLine,
@@ -37,36 +39,13 @@ export default function ScannerPOSPage() {
 
   // Checkout states
   const [customerName, setCustomerName] = useState("");
-  const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [successOrderNum, setSuccessOrderNum] = useState<string | null>(null);
   const [lastOrderTotal, setLastOrderTotal] = useState(0);
-
-  // Customer Profile autocomplete effect
-  React.useEffect(() => {
-    if (customerName.trim().length < 2) {
-      setCustomerSuggestions([]);
-      return;
-    }
-
-    const fetchCustSuggestions = async () => {
-      try {
-        const { data } = await supabase
-          .from("customers")
-          .select("id, full_name, phone, email")
-          .or(`full_name.ilike.%${customerName}%,phone.ilike.%${customerName}%`)
-          .limit(5);
-
-        if (data) setCustomerSuggestions(data);
-      } catch (e) {
-        console.error("Customer suggestion error:", e);
-      }
-    };
-
-    const timer = setTimeout(fetchCustSuggestions, 150);
-    return () => clearTimeout(timer);
-  }, [customerName]);
+=======
+>>>>>>> main
 
   // Autocomplete fetcher inside useEffect to decouple state updates
   React.useEffect(() => {
@@ -308,27 +287,30 @@ export default function ScannerPOSPage() {
     setSuccessOrderNum(null);
 
     try {
-      // 1. Find or create customer
-      let customerId = null;
-      const targetCustomer = customerName.trim() || "Walk-in Customer";
+      // 1. Resolve customer id — skip DB lookup when picker already gave us one
+      let customerId: string | null = selectedCustomerId;
 
-      const { data: existingCust } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("full_name", targetCustomer)
-        .maybeSingle();
+      if (!customerId) {
+        const targetCustomer = customerName.trim() || "Walk-in Customer";
 
-      if (existingCust) {
-        customerId = existingCust.id;
-      } else {
-        const { data: newCust, error: custErr } = await supabase
+        const { data: existingCust } = await supabase
           .from("customers")
-          .insert([{ full_name: targetCustomer }])
           .select("id")
-          .single();
+          .eq("full_name", targetCustomer)
+          .maybeSingle();
 
-        if (custErr) throw custErr;
-        if (newCust) customerId = newCust.id;
+        if (existingCust) {
+          customerId = existingCust.id;
+        } else {
+          const { data: newCust, error: custErr } = await supabase
+            .from("customers")
+            .insert([{ full_name: targetCustomer }])
+            .select("id")
+            .single();
+
+          if (custErr) throw custErr;
+          if (newCust) customerId = newCust.id;
+        }
       }
 
       // 2. Generate transaction details
@@ -386,6 +368,7 @@ export default function ScannerPOSPage() {
       setSuccessOrderNum(orderNumber);
       setCart([]);
       setCustomerName("");
+      setSelectedCustomerId(null);
       setScannedProduct(null);
     } catch (err: any) {
       console.error("POS Checkout Error:", err);
@@ -458,7 +441,7 @@ export default function ScannerPOSPage() {
                             </span>
                           </div>
                           <div className="text-right">
-                            <span className="font-black text-emerald-400">${s.price.toFixed(2)}</span>
+                            <span className="font-black text-emerald-400">{formatCurrency(s.price)}</span>
                             <div className="text-[9px] text-slate-500 font-bold">Stock: {s.stockQuantity}</div>
                           </div>
                         </button>
@@ -504,7 +487,7 @@ export default function ScannerPOSPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-black text-emerald-400">${scannedProduct.price.toFixed(2)}</div>
+                  <div className="text-2xl font-black text-emerald-400">{formatCurrency(scannedProduct.price)}</div>
                   <div className="text-[10px] text-slate-500 font-bold mt-1">
                     Stock Available: {scannedProduct.stockQuantity}
                   </div>
@@ -589,7 +572,7 @@ export default function ScannerPOSPage() {
 
                 <div className="pt-2 border-t border-dashed border-[#1d2434] flex justify-between items-center text-sm font-black text-white">
                   <span>TOTAL PAID</span>
-                  <span className="text-emerald-400">${lastOrderTotal.toFixed(2)}</span>
+                  <span className="text-emerald-400">{formatCurrency(lastOrderTotal)}</span>
                 </div>
               </div>
 
@@ -641,37 +624,24 @@ export default function ScannerPOSPage() {
           {cart.length > 0 && (
             <Card className="bg-[#111520] border-[#1d2434] shadow-xl rounded-3xl p-6">
               <form onSubmit={handleCheckout} className="space-y-4">
-                <div className="relative">
+                <div>
                   <label className="text-xs font-bold text-slate-300 block mb-1.5 flex items-center gap-1.5">
                     <User className="w-3.5 h-3.5 text-slate-400" /> Customer Profile Name
                   </label>
-                  <Input
-                    placeholder="e.g. Walk-in Customer (or search existing profile)"
+                  <CustomerPicker
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    onBlur={() => setTimeout(() => setCustomerSuggestions([]), 200)}
-                    className="bg-[#0a0d14] border-[#1d2434] text-xs text-white h-10 rounded-xl"
+                    onChange={(name) => {
+                      setCustomerName(name);
+                      setSelectedCustomerId(null);
+                    }}
+                    onSelect={(id, name) => {
+                      setSelectedCustomerId(id);
+                      setCustomerName(name);
+                    }}
+                    onClear={() => setSelectedCustomerId(null)}
+                    placeholder="e.g. Walk-in Customer (or search existing profile)"
+                    inputClassName="bg-[#0a0d14] border-[#1d2434] text-xs text-white h-10 rounded-xl"
                   />
-                  {customerSuggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 mt-1 bg-[#111520] border border-[#1d2434] rounded-2xl overflow-y-auto max-h-[180px] z-50 shadow-2xl divide-y divide-[#1d2434]">
-                      {customerSuggestions.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onMouseDown={() => {
-                            setCustomerName(c.full_name);
-                            setCustomerSuggestions([]);
-                          }}
-                          className="w-full text-left px-4 py-2.5 hover:bg-[#1c2333] transition-colors flex items-center justify-between text-xs cursor-pointer border-0 outline-none"
-                        >
-                          <span className="font-bold text-white">{c.full_name}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {c.phone || c.email || "Registered Profile"}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 <div>
