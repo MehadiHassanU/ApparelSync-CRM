@@ -77,6 +77,15 @@ Node.js 20+ installed.
 ### Installation
 ```bash
 npm install
+### Environment Setup (.env.local)
+When cloning to a new computer, copy `.env.example` to create your local `.env.local` file:
+```bash
+cp .env.example .env.local
+```
+Inside `.env.local`, ensure your Supabase URL and public anon key are set:
+```ini
+NEXT_PUBLIC_SUPABASE_URL=https://kndtuchbhtyunhmybjmr.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
 ### Database Migrations
