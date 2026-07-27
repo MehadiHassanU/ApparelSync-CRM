@@ -117,4 +117,4 @@ npm run build
 This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)** - see the [LICENSE](file:///n:/app_sync/ApparelSync-CRM/LICENSE) file for full details.
 
 ### Commercial & Public Use Terms
-ApparelSync-CRM is open-source. Anyone is free to use, modify, and distribute this software for personal or commercial purposes under the GNU GPL v3.0 license, provided that **attribution credit is given to the original authors** (ApparelSync CRM Team: **Mehadi Hassan Uthso, Nafis, Safin**).
+ApparelSync-CRM is open-source. Anyone is free to use, modify, and distribute this software for personal or commercial purposes under the GNU GPL v3.0 license, provided that **attribution credit is given to the original authors** (ApparelSync CRM Team: **Mehadi Hassan Utsho, Nafis, Safin**).
