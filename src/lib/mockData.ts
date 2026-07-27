@@ -11,7 +11,7 @@ export interface KPIMetrics {
   netProfit: MetricDetail;
 }
 
-export type OrderStatus = "on way" | "delivered" | "awaiting";
+export type OrderStatus = "processing" | "delivered" | "awaiting";
 
 export interface Order {
   id: string;
@@ -24,6 +24,9 @@ export interface Order {
   date: string;
   paymentMethod: string;
   status: OrderStatus;
+  pointsEarned?: number;
+  pointsRedeemed?: number;
+  discountAmount?: number;
 }
 
 // Empty fallback initial lists (Live data is loaded dynamically from Supabase)

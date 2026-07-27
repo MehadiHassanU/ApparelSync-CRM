@@ -72,3 +72,46 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
 CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode);
 CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id);
+
+-- ─── 8. Reward Points & Loyalty System Migration ────────────────────────────
+ALTER TABLE customers 
+ADD COLUMN IF NOT EXISTS reward_points INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS tier TEXT DEFAULT 'Bronze';
+
+ALTER TABLE products 
+ADD COLUMN IF NOT EXISTS bonus_points INTEGER DEFAULT 0;
+
+ALTER TABLE sales 
+ADD COLUMN IF NOT EXISTS points_earned INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS points_redeemed INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0.00;
+
+CREATE TABLE IF NOT EXISTS point_transactions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+  order_id UUID REFERENCES sales(id) ON DELETE SET NULL,
+  points_change INTEGER NOT NULL,
+  type TEXT NOT NULL, -- 'EARNED', 'REDEEMED', 'BONUS', 'ADJUSTMENT'
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE point_transactions ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'point_transactions' AND policyname = 'Allow all for anon on point_transactions') THEN
+    CREATE POLICY "Allow all for anon on point_transactions" ON point_transactions FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_point_transactions_customer_id ON point_transactions(customer_id);
+CREATE INDEX IF NOT EXISTS idx_point_transactions_order_id ON point_transactions(order_id);
+
+-- ─── 9. Fix sales_status_check Constraint ────────────────────────────────────
+-- Update the constraint on the sales table to accept 'processing', 'delivered', 'awaiting'
+ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_status_check;
+ALTER TABLE sales ADD CONSTRAINT sales_status_check 
+  CHECK (status IN ('processing', 'delivered', 'awaiting', 'completed', 'on way', 'pending'));
+
+

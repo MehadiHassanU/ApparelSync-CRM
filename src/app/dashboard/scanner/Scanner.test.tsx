@@ -98,7 +98,7 @@ describe("Scanner POS Page Integration Tests", () => {
     });
 
     // Fill customer name
-    const custInput = screen.getByPlaceholderText("e.g. Walk-in Customer");
+    const custInput = screen.getByPlaceholderText(/Walk-in Customer/i);
     fireEvent.change(custInput, { target: { value: "Jane Doe" } });
 
     // Submit checkout

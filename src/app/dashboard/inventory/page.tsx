@@ -83,6 +83,7 @@ export default function InventoryPage() {
   const [prodStock, setProdStock] = useState("");
   const [prodCategoryId, setProdCategoryId] = useState("");
   const [prodBarcode, setProdBarcode] = useState("");
+  const [prodBonusPoints, setProdBonusPoints] = useState("");
 
   // Category Form State
   const [newCatName, setNewCatName] = useState("");
@@ -114,6 +115,7 @@ export default function InventoryPage() {
           category_id,
           barcode,
           qr_data,
+          bonus_points,
           created_at,
           updated_at,
           category:categories ( name )
@@ -133,6 +135,7 @@ export default function InventoryPage() {
           categoryName: item.category?.name || "Uncategorized",
           barcode: item.barcode,
           qrData: item.qr_data,
+          bonusPoints: item.bonus_points || 0,
           createdAt: item.created_at,
           updatedAt: item.updated_at,
         }));
@@ -177,6 +180,7 @@ export default function InventoryPage() {
             stock_quantity: stockNum,
             category_id: prodCategoryId ? prodCategoryId : null,
             barcode: prodBarcode.trim() || null,
+            bonus_points: parseInt(prodBonusPoints, 10) || 0,
           },
         ])
         .select("id")
@@ -224,6 +228,7 @@ export default function InventoryPage() {
     setProdStock(product.stockQuantity.toString());
     setProdCategoryId(product.categoryId || "");
     setProdBarcode(product.barcode || "");
+    setProdBonusPoints(product.bonusPoints ? product.bonusPoints.toString() : "");
     setIsEditOpen(true);
   };
 
@@ -247,6 +252,7 @@ export default function InventoryPage() {
           category_id: prodCategoryId ? prodCategoryId : null,
           barcode: prodBarcode.trim() || null,
           qr_data: qrPayload,
+          bonus_points: parseInt(prodBonusPoints, 10) || 0,
           updated_at: new Date().toISOString(),
         })
         .eq("id", selectedProduct.id);
@@ -541,13 +547,25 @@ export default function InventoryPage() {
                       className="bg-[#0a0d14] border-[#1d2434] text-xs text-white h-10 rounded-xl"
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div>
                     <label className="text-xs font-bold text-slate-300 block mb-1.5">Manual Barcode (Optional)</label>
                     <Input
                       placeholder="UPC / EAN string"
                       value={prodBarcode}
                       onChange={(e) => setProdBarcode(e.target.value)}
                       className="bg-[#0a0d14] border-[#1d2434] text-xs text-white h-10 rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-amber-400 block mb-1.5 flex items-center gap-1">
+                      ⭐ Bonus Reward Points
+                    </label>
+                    <Input
+                      type="number"
+                      placeholder="e.g. 50 pts"
+                      value={prodBonusPoints}
+                      onChange={(e) => setProdBonusPoints(e.target.value)}
+                      className="bg-[#0a0d14] border-amber-500/30 focus:border-amber-400 text-xs text-amber-300 font-bold h-10 rounded-xl"
                     />
                   </div>
                 </div>
@@ -708,7 +726,14 @@ export default function InventoryPage() {
                   return (
                     <TableRow key={prod.id} className={`border-[#171d2b] transition-colors ${isLowStock ? "bg-amber-500/5 hover:bg-amber-500/10" : "hover:bg-[#171d2b]"}`}>
                       <TableCell className="px-5 py-4">
-                        <div className="font-bold text-white text-sm">{prod.name}</div>
+                        <div className="font-bold text-white text-sm flex items-center gap-2">
+                          {prod.name}
+                          {prod.bonusPoints && prod.bonusPoints > 0 ? (
+                            <Badge variant="outline" className="bg-amber-500/10 text-amber-300 border-amber-500/30 text-[9px] font-extrabold px-1.5 py-0">
+                              + {prod.bonusPoints} PTS BONUS
+                            </Badge>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell className="px-5 py-4 font-mono text-xs font-extrabold text-emerald-400">{prod.sku}</TableCell>
                       <TableCell className="px-5 py-4">
@@ -822,12 +847,24 @@ export default function InventoryPage() {
                     className="bg-[#0a0d14] border-[#1d2434] text-xs text-white h-10 rounded-xl"
                   />
                 </div>
-                <div className="col-span-2">
+                <div>
                   <label className="text-xs font-bold text-slate-300 block mb-1.5">Manual Barcode (Optional)</label>
                   <Input
                     value={prodBarcode}
                     onChange={(e) => setProdBarcode(e.target.value)}
                     className="bg-[#0a0d14] border-[#1d2434] text-xs text-white h-10 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-amber-400 block mb-1.5 flex items-center gap-1">
+                    ⭐ Bonus Reward Points
+                  </label>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 50 pts"
+                    value={prodBonusPoints}
+                    onChange={(e) => setProdBonusPoints(e.target.value)}
+                    className="bg-[#0a0d14] border-amber-500/30 focus:border-amber-400 text-xs text-amber-300 font-bold h-10 rounded-xl"
                   />
                 </div>
               </div>

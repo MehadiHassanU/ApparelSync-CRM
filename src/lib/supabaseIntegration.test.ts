@@ -13,7 +13,7 @@ describe('Database Integration Tests (Supabase Operations)', () => {
         order_number: 'NA874839',
         total: 1299.99,
         payment_method: 'PayPal',
-        status: 'on way',
+        status: 'processing',
         sale_date: '2026-06-25T12:00:00Z',
         customer_id: 'cust-uuid-1',
         customer: { full_name: 'Sarah Jenkins' },
