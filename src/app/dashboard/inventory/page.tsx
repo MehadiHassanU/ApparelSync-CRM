@@ -52,6 +52,7 @@ import {
   ArrowUpDown,
   MoreHorizontal,
   X,
+  DollarSign,
 } from "lucide-react";
 import BarcodeView from "@/components/inventory/BarcodeView";
 
@@ -395,10 +396,11 @@ export default function InventoryPage() {
   const kpis = useMemo(() => {
     const totalCount = products.length;
     const totalStock = products.reduce((sum, p) => sum + p.stockQuantity, 0);
+    const totalStockValue = products.reduce((sum, p) => sum + p.price * p.stockQuantity, 0);
     const lowStockCount = products.filter((p) => p.stockQuantity <= 5).length;
     const categoriesCount = categories.length;
 
-    return { totalCount, totalStock, lowStockCount, categoriesCount };
+    return { totalCount, totalStock, totalStockValue, lowStockCount, categoriesCount };
   }, [products, categories]);
 
   return (
@@ -624,12 +626,12 @@ export default function InventoryPage() {
 
         <Card className="bg-[#111520] border-[#1d2434] text-white shadow-xl rounded-3xl p-5 hover:border-emerald-500/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-0">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Categories</span>
-            <Layers className="w-4 h-4 text-teal-400" />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Stock Value</span>
+            <DollarSign className="w-4 h-4 text-amber-400" />
           </CardHeader>
           <CardContent className="p-0 pt-3">
-            <div className="text-3xl font-black">{loading ? "-" : kpis.categoriesCount}</div>
-            <p className="text-[10px] text-slate-500 mt-1 font-semibold">Filter categories configured</p>
+            <div className="text-3xl font-black">{loading ? "-" : formatCurrency(kpis.totalStockValue)}</div>
+            <p className="text-[10px] text-slate-500 mt-1 font-semibold">Total inventory purchase value</p>
           </CardContent>
         </Card>
       </div>
