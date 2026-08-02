@@ -26,10 +26,9 @@ const navItems = [
   { label: "Inventory", href: "/dashboard/inventory", icon: Briefcase },
   { label: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
   { label: "Scanner", href: "/dashboard/scanner", icon: ScanLine },
-  { label: "Reports", href: "#", icon: FileText },
-  { label: "Revenue", href: "#", icon: TrendingUp },
+  { label: "Reports", href: "/dashboard/reports", icon: FileText },
   { label: "Customers", href: "/dashboard/customers", icon: Contact },
-  { label: "Settings", href: "#", icon: Settings },
+  { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 export default function Sidebar() {

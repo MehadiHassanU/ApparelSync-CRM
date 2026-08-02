@@ -38,4 +38,20 @@ describe("Sidebar Navigation Component Tests", () => {
     expect(customerLink).not.toBeNull();
     expect(customerLink?.getAttribute("href")).toBe("/dashboard/customers");
   });
+
+  it("links Reports menu item to /dashboard/reports route", () => {
+    render(<Sidebar />);
+
+    const reportLink = screen.getByText("Reports").closest("a");
+    expect(reportLink).not.toBeNull();
+    expect(reportLink?.getAttribute("href")).toBe("/dashboard/reports");
+  });
+
+  it("links Settings menu item to /dashboard/settings route", () => {
+    render(<Sidebar />);
+
+    const settingsLink = screen.getByText("Settings").closest("a");
+    expect(settingsLink).not.toBeNull();
+    expect(settingsLink?.getAttribute("href")).toBe("/dashboard/settings");
+  });
 });

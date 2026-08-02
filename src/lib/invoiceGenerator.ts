@@ -8,13 +8,16 @@ export interface InvoiceItem {
 }
 
 export interface InvoiceData {
+  id?: string;
   orderNumber: string;
   customerName: string;
+  category?: string;
   date: string;
   paymentMethod: string;
   status: string;
   total?: number;
   price?: number;
+  formattedPrice?: string;
   pointsEarned?: number;
   pointsRedeemed?: number;
   discountAmount?: number;
