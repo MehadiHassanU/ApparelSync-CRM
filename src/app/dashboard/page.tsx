@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { formatCurrency } from "@/lib/utils";
@@ -31,6 +31,8 @@ import {
   AlertCircle,
   PieChart as PieChartIcon,
   Search,
+  CreditCard,
+  Box,
 } from "lucide-react";
 import CustomerPicker from "@/components/customers/CustomerPicker";
 import {
@@ -90,6 +92,17 @@ export default function Dashboard() {
   const [newPayment, setNewPayment] = useState("PayPal");
   const [newStatus, setNewStatus] = useState<OrderStatus>("on way");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Product picker states (for optional product selection)
+  const [productQuery, setProductQuery] = useState("");
+  const [productSuggestions, setProductSuggestions] = useState<Array<{ id: string; name: string; sku: string; price: number; stock_quantity: number }>>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedProductName, setSelectedProductName] = useState("");
+  const [selectedProductSku, setSelectedProductSku] = useState("");
+  const productSearchRef = useRef(false);
+
+  // Credit card last 4 digits state
+  const [cardLast4, setCardLast4] = useState("");
 
   // ─── Fetch Sales Data from Supabase ─────────────────────────────────────────
   const fetchSalesFromSupabase = useCallback(async () => {
@@ -235,23 +248,49 @@ export default function Dashboard() {
       const priceNum = parseFloat(newPrice);
       const generatedOrderNum = `NA${Math.floor(100000 + Math.random() * 900000)}`;
 
-      const { error: saleErr } = await supabase.from("sales").insert([
-        {
-          order_number: generatedOrderNum,
-          customer_id: customerId,
-          subtotal: priceNum,
-          total: priceNum,
-          payment_method: newPayment,
-          status: newStatus,
-        },
-      ]);
+      const { data: saleData, error: saleErr } = await supabase
+        .from("sales")
+        .insert([
+          {
+            order_number: generatedOrderNum,
+            customer_id: customerId,
+            subtotal: priceNum,
+            total: priceNum,
+            payment_method: newPayment,
+            status: newStatus,
+            card_last4: newPayment === "Credit Card" ? cardLast4.trim() || null : null,
+          },
+        ])
+        .select("id")
+        .single();
 
       if (saleErr) throw saleErr;
+
+      // If a product was selected, create sale_items row
+      if (selectedProductId && saleData?.id) {
+        const { error: itemErr } = await supabase.from("sale_items").insert([
+          {
+            sale_id: saleData.id,
+            product_id: selectedProductId,
+            product_name: selectedProductName,
+            quantity: 1,
+            unit_price: priceNum,
+            total_price: priceNum,
+          },
+        ]);
+
+        if (itemErr) throw itemErr;
+      }
 
       setIsAddDialogOpen(false);
       setNewCustomer("");
       setNewCustomerId(null);
       setNewPrice("");
+      setProductQuery("");
+      setSelectedProductId(null);
+      setSelectedProductName("");
+      setSelectedProductSku("");
+      setCardLast4("");
       await fetchSalesFromSupabase();
     } catch (err: any) {
       console.error("Add Order Error:", err);
@@ -259,6 +298,64 @@ export default function Dashboard() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // ─── Product Picker Debounced Search ─────────────────────────────────────────
+  useEffect(() => {
+    if (productQuery.trim().length < 2) {
+      setProductSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await supabase
+          .from("products")
+          .select("id, name, sku, price, stock_quantity")
+          .or(
+            `name.ilike.%${productQuery.trim()}%,sku.ilike.%${productQuery.trim()}%`
+          )
+          .limit(5);
+
+        if (data) setProductSuggestions(data as Array<{ id: string; name: string; sku: string; price: number; stock_quantity: number }>);
+      } catch (e) {
+        console.error("Product picker suggestion error:", e);
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [productQuery]);
+
+  const handleProductChange = (value: string) => {
+    productSearchRef.current = false;
+    setProductQuery(value);
+    // Clear selected product when user types manually
+    if (selectedProductId) {
+      setSelectedProductId(null);
+      setSelectedProductName("");
+      setSelectedProductSku("");
+    }
+  };
+
+  const handleProductSelect = (product: { id: string; name: string; sku: string; price: number }) => {
+    productSearchRef.current = true;
+    setProductSuggestions([]);
+    setProductQuery(product.name);
+    setSelectedProductId(product.id);
+    setSelectedProductName(product.name);
+    setSelectedProductSku(product.sku);
+    setNewPrice(product.price.toFixed(2));
+  };
+
+  const handleProductBlur = () => {
+    setTimeout(() => {
+      setProductSuggestions([]);
+      if (!productSearchRef.current) {
+        setSelectedProductId(null);
+        setSelectedProductName("");
+        setSelectedProductSku("");
+      }
+    }, 200);
   };
 
   // ─── CRUD: Mark Delivered ──────────────────────────────────────────────────
@@ -503,6 +600,44 @@ export default function Dashboard() {
                       />
                     </div>
                     <div>
+                      <label className="text-xs font-bold text-slate-300 block mb-1">
+                        Select Product from Inventory (optional)
+                      </label>
+                      <div className="relative">
+                        <Input
+                          type="text"
+                          value={productQuery}
+                          onChange={(e) => handleProductChange(e.target.value)}
+                          onBlur={handleProductBlur}
+                          placeholder="Search product by name or SKU..."
+                          className="bg-[#0a0d14] border-[#1d2434] text-xs text-white h-10 rounded-xl"
+                          autoComplete="off"
+                        />
+                        {productSuggestions.length > 0 && (
+                          <div className="absolute left-0 right-0 mt-1 bg-[#111520] border border-[#1d2434] rounded-2xl overflow-y-auto max-h-[180px] z-50 shadow-2xl divide-y divide-[#1d2434]">
+                            {productSuggestions.map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onMouseDown={() => handleProductSelect(p)}
+                                className="w-full text-left px-4 py-2.5 hover:bg-[#1c2333] transition-colors flex items-center justify-between text-xs cursor-pointer border-0 outline-none"
+                              >
+                                <span className="font-bold text-white">{p.name}</span>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  {p.sku} • {formatCurrency(p.price)} • Stock: {p.stock_quantity}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {selectedProductId && (
+                        <p className="text-[10px] text-emerald-400 mt-1 font-medium">
+                          Selected: {selectedProductName} ({selectedProductSku}) — price auto-filled
+                        </p>
+                      )}
+                    </div>
+                    <div>
                       <label className="text-xs font-bold text-slate-300 block mb-1">Total Amount (BDT)</label>
                       <Input
                         required
@@ -519,7 +654,13 @@ export default function Dashboard() {
                         <label className="text-xs font-bold text-slate-300 block mb-1">Payment Method</label>
                         <select
                           value={newPayment}
-                          onChange={(e) => setNewPayment(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setNewPayment(val);
+                            if (val !== "Credit Card") {
+                              setCardLast4("");
+                            }
+                          }}
                           className="w-full bg-[#0a0d14] border border-[#1d2434] text-xs text-white h-10 rounded-xl px-3 outline-none focus:border-emerald-500"
                         >
                           <option value="Cash">Cash</option>
@@ -528,6 +669,23 @@ export default function Dashboard() {
                           <option value="bKash">bKash</option>
                         </select>
                       </div>
+                      {newPayment === "Credit Card" && (
+                        <div>
+                          <label className="text-xs font-bold text-slate-300 block mb-1">
+                            Last 4 Digits of Card
+                          </label>
+                          <Input
+                            type="text"
+                            maxLength={4}
+                            placeholder="4242"
+                            value={cardLast4}
+                            onChange={(e) =>
+                              setCardLast4(e.target.value.replace(/\D/g, ""))
+                            }
+                            className="bg-[#0a0d14] border-[#1d2434] text-xs text-white h-10 rounded-xl"
+                          />
+                        </div>
+                      )}
                       <div>
                         <label className="text-xs font-bold text-slate-300 block mb-1">Initial Status</label>
                         <select
