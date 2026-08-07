@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Order, OrderStatus } from "@/lib/mockData";
 import { supabase } from "@/lib/supabaseClient";
 import { Customer } from "@/lib/types";
+import { formatCurrency } from "@/lib/utils";
 import { generateInvoicePDF } from "@/lib/invoiceGenerator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -159,7 +160,7 @@ export default function OrdersPage() {
             customerId: item.customer_id,
             category: "Apparel",
             price: Number(item.total),
-            formattedPrice: `$${Number(item.total || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+            formattedPrice: formatCurrency(Number(item.total || 0)),
             date: item.sale_date ? item.sale_date.split("T")[0] : new Date().toISOString().split("T")[0],
             paymentMethod: item.payment_method || "Cash",
             status: statusStr,
@@ -338,7 +339,7 @@ export default function OrdersPage() {
             finalCustomerId,
             -safePointsToRedeem,
             "REDEEMED",
-            `Redeemed for $${discountVal.toFixed(2)} discount on Order #${generatedOrderNumber}`,
+            `Redeemed for ${formatCurrency(discountVal)} discount on Order #${generatedOrderNumber}`,
             saleData.id
           );
         }
@@ -362,7 +363,7 @@ export default function OrdersPage() {
         customerId: saleData.customer_id,
         category: newCategory,
         price: finalPayableTotal,
-        formattedPrice: `$${finalPayableTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        formattedPrice: formatCurrency(finalPayableTotal),
         date: new Date().toISOString().split("T")[0],
         paymentMethod: newPayment,
         status: (saleData.status as OrderStatus) || "processing",
@@ -583,7 +584,7 @@ export default function OrdersPage() {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-slate-400">Total Price ($)</label>
+                    <label className="text-xs font-semibold text-slate-400">Total Price (৳)</label>
                     <Input
                       type="number"
                       step="0.01"
@@ -653,7 +654,7 @@ export default function OrdersPage() {
                         <div className="space-y-1.5 pt-1">
                           <div className="flex items-center justify-between text-xs text-slate-300 font-medium">
                             <span>Redeem Points for Discount:</span>
-                            <span className="text-emerald-400 font-bold">100 pts = $5 off</span>
+                            <span className="text-emerald-400 font-bold">100 pts = ৳5 off</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <Input
@@ -762,7 +763,7 @@ export default function OrdersPage() {
           </CardHeader>
           <CardContent className="!p-0">
             <div className="text-2xl font-black text-white">
-              ${orderMetrics.totalRevenue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatCurrency(orderMetrics.totalRevenue)}
             </div>
             <p className="text-xs text-slate-500 mt-1">Cumulative sales total</p>
           </CardContent>
@@ -899,12 +900,10 @@ export default function OrdersPage() {
                         ) : null}
 
                         <DropdownMenu>
-                          <DropdownMenuTrigger
-                            render={
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-white" />
-                            }
-                          >
-                            <MoreHorizontal className="w-4 h-4" />
+                          <DropdownMenuTrigger className="h-8 w-8 p-0 text-slate-400 hover:text-white">
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800 text-slate-200">
                             <DropdownMenuItem
@@ -957,7 +956,7 @@ export default function OrdersPage() {
         <Dialog open={!!selectedOrderDetails} onOpenChange={() => setSelectedOrderDetails(null)}>
           <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-white flex items-center justify-between">
+              <DialogTitle className="text-xl font-bold text-white flex items-center justify-between pr-10">
                 <span>Order #{selectedOrderDetails.orderNumber}</span>
                 {renderStatusBadge(selectedOrderDetails.status)}
               </DialogTitle>
