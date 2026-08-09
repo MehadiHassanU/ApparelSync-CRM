@@ -70,6 +70,21 @@ ApparelSync-CRM is a modern, high-performance Customer Relationship Management (
 
 ---
 
+## 🏛️ Software Architecture & Design Patterns
+
+The codebase applies established enterprise software design patterns:
+
+1. **Factory Pattern (`src/lib/patterns/PaymentFactory.ts`)**:
+   - `PaymentProcessorFactory` dynamically instantiates payment processors (`CashPaymentProcessor`, `BkashPaymentProcessor`, `CreditCardPaymentProcessor`, `PaypalPaymentProcessor`) providing a unified interface (`IPaymentProcessor`) for validation, fee computation, and settlement.
+
+2. **Builder Pattern (`src/lib/patterns/InvoiceBuilder.ts`)**:
+   - `InvoiceBuilder` separates complex invoice/receipt object construction from representation, allowing fluent method chaining (`setCustomer()`, `addItem()`, `applyLoyaltyRewards()`, `build()`) with automatic total calculations.
+
+3. **Observer Pattern (`src/lib/patterns/EventObserver.ts`)**:
+   - `PosEventHub` provides a publish-subscribe event bus allowing concrete observers (`LowStockAlertObserver`, `LoyaltyPointsObserver`) to listen and react to POS lifecycle events in real time.
+
+---
+
 ## 👥 Team Branching Strategy
 
 The repository follows a clean team workflow:
