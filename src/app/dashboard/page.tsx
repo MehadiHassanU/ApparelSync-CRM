@@ -33,8 +33,12 @@ import {
   Search,
   CreditCard,
   Box,
+  BarChart3,
+  Calendar,
 } from "lucide-react";
 import CustomerPicker from "@/components/customers/CustomerPicker";
+import GraphDetailsModal from "@/components/dashboard/GraphDetailsModal";
+import { TimeframeMode, aggregateOrdersByTimeframe } from "@/lib/analyticsUtils";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -82,6 +86,7 @@ export default function Dashboard() {
   const [isViewChartOpen, setIsViewChartOpen] = useState(false);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
   const [activePieIndex, setActivePieIndex] = useState(0);
+  const [timeframe, setTimeframe] = useState<TimeframeMode>("daily");
 
   // Form states for adding new order
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -183,27 +188,10 @@ export default function Dashboard() {
     };
   }, [orders]);
 
-  // Dynamic Revenue Chart Data
+  // Dynamic Revenue Chart Data grouped by active timeframe (Daily, Weekly, Monthly)
   const revenueChartData = useMemo(() => {
-    if (orders.length === 0) {
-      return [
-        { date: "Mon", revenue: 1200 },
-        { date: "Tue", revenue: 2100 },
-        { date: "Wed", revenue: 1800 },
-        { date: "Thu", revenue: 2400 },
-        { date: "Fri", revenue: 3100 },
-      ];
-    }
-    const map: Record<string, number> = {};
-    orders.forEach((o) => {
-      const d = o.date.slice(5);
-      map[d] = (map[d] || 0) + o.price;
-    });
-    return Object.entries(map)
-      .map(([date, revenue]) => ({ date, revenue }))
-      .slice(0, 7)
-      .reverse();
-  }, [orders]);
+    return aggregateOrdersByTimeframe(orders, timeframe);
+  }, [orders, timeframe]);
 
   // Processing orders list
   const processingOrders = useMemo(() => {
@@ -483,10 +471,64 @@ export default function Dashboard() {
       {/* Analytics Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card className="lg:col-span-2 bg-[#111520] border-[#1d2434] shadow-2xl rounded-3xl p-6 sm:p-8">
-          <CardHeader className="p-0 pb-6 flex flex-row items-center justify-between">
+          <CardHeader className="p-0 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <CardTitle className="text-lg font-black text-white">Revenue Telemetry</CardTitle>
-              <p className="text-xs text-slate-400 mt-1 font-medium">Daily transaction volume trends</p>
+              <CardTitle className="text-lg font-black text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-emerald-400" />
+                Revenue Telemetry
+              </CardTitle>
+              <p className="text-xs text-slate-400 mt-1 font-medium">
+                {timeframe === "daily" ? "Daily" : timeframe === "weekly" ? "Weekly" : "Monthly"} transaction volume trends
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Daily / Weekly / Monthly View Selector */}
+              <div className="flex items-center gap-1 bg-[#0a0d14] border border-[#1d2434] p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setTimeframe("daily")}
+                  className={`px-3 py-1.5 text-[11px] font-extrabold rounded-lg transition-all cursor-pointer ${
+                    timeframe === "daily"
+                      ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Daily
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimeframe("weekly")}
+                  className={`px-3 py-1.5 text-[11px] font-extrabold rounded-lg transition-all cursor-pointer ${
+                    timeframe === "weekly"
+                      ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Weekly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimeframe("monthly")}
+                  className={`px-3 py-1.5 text-[11px] font-extrabold rounded-lg transition-all cursor-pointer ${
+                    timeframe === "monthly"
+                      ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Monthly
+                </button>
+              </div>
+
+              {/* View Graph Details Button */}
+              <Button
+                onClick={() => setIsViewChartOpen(true)}
+                size="sm"
+                variant="outline"
+                className="bg-[#0a0d14] hover:bg-[#1a2233] text-emerald-400 border border-[#1d2434] font-extrabold text-xs rounded-xl h-9 px-3.5 flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <BarChart3 className="w-3.5 h-3.5" /> Graph Details
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="p-0 h-[280px] w-full">
@@ -498,10 +540,11 @@ export default function Dashboard() {
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="date" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                <XAxis dataKey="label" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
                 <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
                 <Tooltip
                   contentStyle={{ backgroundColor: "#0a0d14", borderColor: "#1d2434", borderRadius: "12px", color: "#fff", fontSize: "12px" }}
+                  formatter={(val: any) => [formatCurrency(Number(val)), "Revenue"]}
                 />
                 <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
               </AreaChart>
@@ -801,6 +844,13 @@ export default function Dashboard() {
           </div>
         </div>
       </Card>
+
+      {/* Multi-Timeframe Graph Details Modal */}
+      <GraphDetailsModal
+        isOpen={isViewChartOpen}
+        onOpenChange={setIsViewChartOpen}
+        orders={orders}
+      />
     </>
   );
 }

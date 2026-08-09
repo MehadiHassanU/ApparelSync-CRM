@@ -72,4 +72,14 @@ describe("Admin Dashboard Integration & Analytics Tests", () => {
       expect(seeAllBtn?.getAttribute("href")).toBe("/dashboard/orders");
     });
   });
+
+  it("renders timeframe selection buttons (Daily, Weekly, Monthly) and Graph Details trigger", async () => {
+    render(<Dashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("Daily")).toBeDefined();
+      expect(screen.getByText("Weekly")).toBeDefined();
+      expect(screen.getByText("Monthly")).toBeDefined();
+      expect(screen.getByText("Graph Details")).toBeDefined();
+    });
+  });
 });
