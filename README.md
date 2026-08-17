@@ -21,7 +21,7 @@ ApparelSync-CRM is a modern, high-performance Customer Relationship Management (
 
 ### Scorecard Summary
 - **User Stories Completed:** 10 / 10 (100% Complete)
-- **Automated Tests Passing:** 41 / 41 (11 Test Suites)
+- **Automated Tests Passing:** 70 / 70 (18 Test Suites — Unit, Integration, UAT, Negative)
 - **Production Build Status:** Clean (0 Errors)
 
 ---
