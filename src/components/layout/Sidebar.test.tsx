@@ -1,0 +1,60 @@
+import React from "react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import Sidebar from "./Sidebar";
+
+// Mock next/navigation usePathname & useRouter
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/dashboard/customers",
+  useRouter: () => ({
+    push: vi.fn(),
+  }),
+}));
+
+describe("Sidebar Navigation Component Tests", () => {
+  it("renders brand logo and all primary navigation items correctly", () => {
+    render(<Sidebar />);
+
+    expect(screen.getByText("ApparelSync")).toBeDefined();
+    expect(screen.getByText("CRM Suite")).toBeDefined();
+
+    // Verify nav links
+    expect(screen.getByText("Dashboard")).toBeDefined();
+    expect(screen.getByText("Inventory")).toBeDefined();
+    expect(screen.getByText("Orders")).toBeDefined();
+    expect(screen.getByText("Scanner")).toBeDefined();
+    expect(screen.getByText("Customers")).toBeDefined();
+  });
+
+  it("links Orders menu item to /dashboard/orders route", () => {
+    render(<Sidebar />);
+
+    const orderLink = screen.getByText("Orders").closest("a");
+    expect(orderLink).not.toBeNull();
+    expect(orderLink?.getAttribute("href")).toBe("/dashboard/orders");
+  });
+
+  it("links Customers menu item to /dashboard/customers route", () => {
+    render(<Sidebar />);
+
+    const customerLink = screen.getByText("Customers").closest("a");
+    expect(customerLink).not.toBeNull();
+    expect(customerLink?.getAttribute("href")).toBe("/dashboard/customers");
+  });
+
+  it("links Reports menu item to /dashboard/reports route", () => {
+    render(<Sidebar />);
+
+    const reportLink = screen.getByText("Reports").closest("a");
+    expect(reportLink).not.toBeNull();
+    expect(reportLink?.getAttribute("href")).toBe("/dashboard/reports");
+  });
+
+  it("links Settings menu item to /dashboard/settings route", () => {
+    render(<Sidebar />);
+
+    const settingsLink = screen.getByText("Settings").closest("a");
+    expect(settingsLink).not.toBeNull();
+    expect(settingsLink?.getAttribute("href")).toBe("/dashboard/settings");
+  });
+});
