@@ -3,9 +3,12 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import Sidebar from "./Sidebar";
 
-// Mock next/navigation usePathname
+// Mock next/navigation usePathname & useRouter
 vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard/customers",
+  useRouter: () => ({
+    push: vi.fn(),
+  }),
 }));
 
 describe("Sidebar Navigation Component Tests", () => {

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   FileText,
@@ -33,7 +33,16 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleLogout = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("apparelsync_auth");
+      localStorage.removeItem("apparelsync_user");
+    }
+    router.push("/login");
+  };
 
   return (
     <>
@@ -117,7 +126,10 @@ export default function Sidebar() {
 
         {/* Sidebar Footer Logout Button */}
         <div className="w-full px-1">
-          <button className="flex items-center gap-4 px-3.5 py-3 rounded-2xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 text-base font-semibold transition-all w-full overflow-hidden whitespace-nowrap">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-4 px-3.5 py-3 rounded-2xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 text-base font-semibold transition-all w-full overflow-hidden whitespace-nowrap cursor-pointer"
+          >
             <LogOut className="w-5 h-5 shrink-0" />
             <span className="opacity-100 md:opacity-0 md:group-hover/sidebar:opacity-100 transition-opacity duration-300">Logout</span>
           </button>
